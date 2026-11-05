@@ -1,0 +1,22 @@
+{
+  "name": "onshift",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Expiring, least-privilege authority for staff and AI agents on ENSv2.",
+  "license": "MIT",
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "export": "node scripts/export-abis.mjs",
+    "test": "cd contracts && forge test -vv",
+    "test:gas": "cd contracts && forge test --gas-report",
+    "build": "cd contracts && forge build && cd .. && npm run export && npm --workspace app run build",
+    "typecheck": "npm --workspace app run typecheck",
+    "agent": "node scripts/agent-demo.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
