@@ -20,7 +20,7 @@ contract UpgradeSepolia is Script, DeploymentWriter {
         string memory json = vm.readFile(_path());
         PassIssuer issuer = PassIssuer(vm.parseJsonAddress(json, ".passIssuer"));
         ShiftGate oldGate = ShiftGate(vm.parseJsonAddress(json, ".shiftGate"));
-        require(msg.sender == issuer.ORG(), "broadcast as the org");
+        require(msg.sender == issuer.org(), "broadcast as the org");
 
         vm.startBroadcast();
         uint256 startBlock = block.number;
@@ -32,7 +32,7 @@ contract UpgradeSepolia is Script, DeploymentWriter {
             keccak256(
                 abi.encodePacked(vm.parseJsonBytes32(json, ".orgNode"), keccak256("till"))
             ),
-            issuer.ORG()
+            issuer.org()
         );
         uint256 float = oldGate.floatBalance();
         if (float > 0) oldGate.withdrawFloat(address(gate), float);

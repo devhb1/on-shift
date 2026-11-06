@@ -25,7 +25,7 @@ export const passIssuerAbi = [
         "internalType": "address"
       },
       {
-        "name": "org",
+        "name": "org_",
         "type": "address",
         "internalType": "address"
       },
@@ -98,19 +98,6 @@ export const passIssuerAbi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ORG",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -443,6 +430,19 @@ export const passIssuerAbi = [
   },
   {
     "type": "function",
+    "name": "org",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "orgName",
     "inputs": [],
     "outputs": [
@@ -535,6 +535,19 @@ export const passIssuerAbi = [
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "transferOrg",
+    "inputs": [
+      {
+        "name": "next",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "LeadUpdated",
     "inputs": [
@@ -555,6 +568,25 @@ export const passIssuerAbi = [
         "type": "bool",
         "indexed": false,
         "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrgTransferred",
+    "inputs": [
+      {
+        "name": "previous",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "next",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -751,6 +783,11 @@ export const passIssuerAbi = [
     "type": "error",
     "name": "UnknownPass",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroOrg",
+    "inputs": []
   }
 ] as const;
 
@@ -784,7 +821,7 @@ export const shiftGateAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "org",
+        "name": "org_",
         "type": "address",
         "internalType": "address"
       }
@@ -800,19 +837,6 @@ export const shiftGateAbi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ORG",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -944,6 +968,19 @@ export const shiftGateAbi = [
         "name": "refunded",
         "type": "uint128",
         "internalType": "uint128"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "org",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -1133,6 +1170,19 @@ export const shiftGateAbi = [
   },
   {
     "type": "function",
+    "name": "transferOrg",
+    "inputs": [
+      {
+        "name": "next",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "withdrawFloat",
     "inputs": [
       {
@@ -1189,6 +1239,25 @@ export const shiftGateAbi = [
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrgTransferred",
+    "inputs": [
+      {
+        "name": "previous",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "next",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1326,6 +1395,11 @@ export const shiftGateAbi = [
     "type": "error",
     "name": "UnknownOrder",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroOrg",
+    "inputs": []
   }
 ] as const;
 
@@ -1354,7 +1428,7 @@ export const incidentSwitchAbi = [
         "internalType": "bytes32"
       },
       {
-        "name": "org",
+        "name": "org_",
         "type": "address",
         "internalType": "address"
       },
@@ -1425,19 +1499,6 @@ export const incidentSwitchAbi = [
   {
     "type": "function",
     "name": "GATE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ORG",
     "inputs": [],
     "outputs": [
       {
@@ -1619,6 +1680,19 @@ export const incidentSwitchAbi = [
   },
   {
     "type": "function",
+    "name": "org",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "passIssuer",
     "inputs": [],
     "outputs": [
@@ -1750,6 +1824,19 @@ export const incidentSwitchAbi = [
   },
   {
     "type": "function",
+    "name": "transferOrg",
+    "inputs": [
+      {
+        "name": "next",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "watchtower",
     "inputs": [],
     "outputs": [
@@ -1795,6 +1882,25 @@ export const incidentSwitchAbi = [
         "type": "uint32",
         "indexed": false,
         "internalType": "uint32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrgTransferred",
+    "inputs": [
+      {
+        "name": "previous",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "next",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1930,6 +2036,11 @@ export const incidentSwitchAbi = [
   {
     "type": "error",
     "name": "WrongCodehash",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroOrg",
     "inputs": []
   }
 ] as const;

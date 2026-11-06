@@ -25,7 +25,7 @@ contract IncidentSwitch {
     IPermissionedResolver public immutable PARENT_RESOLVER;
     bytes32 public immutable ORG_NODE;
     bytes32 public immutable TILL_NODE;
-    address public immutable ORG;
+    address public org;
     address public immutable GATE;
     /// @dev The codehash the auditor last attested. Promote requires the live gate to match it,
     ///      so a later implementation can be adopted without redeploying this switch.
@@ -73,9 +73,12 @@ contract IncidentSwitch {
     error NotQuarantined();
     error AuditorNotApproved();
     error WrongCodehash();
+    error ZeroOrg();
+
+    event OrgTransferred(address indexed previous, address indexed next);
 
     modifier onlyOrg() {
-        if (msg.sender != ORG) revert NotOrg();
+        if (msg.sender != org) revert NotOrg();
         _;
     }
 
@@ -84,7 +87,7 @@ contract IncidentSwitch {
         IPermissionedResolver parentResolver,
         bytes32 orgNode,
         bytes32 tillNode,
-        address org,
+        address org_,
         address gate,
         address issuer,
         IPermissionedRegistry emptyRegistry,
@@ -97,7 +100,8 @@ contract IncidentSwitch {
         PARENT_RESOLVER = parentResolver;
         ORG_NODE = orgNode;
         TILL_NODE = tillNode;
-        ORG = org;
+        if (org_ == address(0)) revert ZeroOrg();
+        org = org_;
         GATE = gate;
         passIssuer = issuer;
         EMPTY_REGISTRY = emptyRegistry;
@@ -111,6 +115,12 @@ contract IncidentSwitch {
     function setPassIssuer(address issuer) external onlyOrg {
         if (passIssuer != address(0)) revert IssuerAlreadySet();
         passIssuer = issuer;
+    }
+
+    function transferOrg(address next) external onlyOrg {
+        if (next == address(0)) revert ZeroOrg();
+        emit OrgTransferred(org, next);
+        org = next;
     }
 
     function setWatchtower(address who) external onlyOrg {
@@ -127,7 +137,7 @@ contract IncidentSwitch {
     /// @notice Watchtower (or org) aliases the till name onto the quarantine name.
     ///         Cannot point at an arbitrary address — the target DNS is fixed at deploy.
     function quarantineTill() external {
-        if (msg.sender != ORG && msg.sender != watchtower) revert NotWatchtower();
+        if (msg.sender != org && msg.sender != watchtower) revert NotWatchtower();
         if (tillQuarantined) revert AlreadyQuarantined();
         tillQuarantined = true;
         lastChangeAt = uint64(block.timestamp);
@@ -198,7 +208,7 @@ contract IncidentSwitch {
                     | RegistryRoles.ROLE_SET_SUBREGISTRY | RegistryRoles.ROLE_SET_RESOLVER
                     | RegistryRoles.ROLE_UPGRADE
             ),
-            ORG
+            org
         );
         registry.setParent(PARENT, "ops");
 

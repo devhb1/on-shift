@@ -63,6 +63,8 @@ export type Lead = { address: Address; dailyBudget: number; active: boolean; rem
 export type Snapshot = {
   blockTs: number;
   currentOps: Address;
+  /** Live org from PassIssuer.org(). Falls back to the deployment address on older gates. */
+  org: Address;
   incident: boolean;
   incidentReason: string;
   /** False on deployments whose IncidentSwitch predates till aliasing. */
@@ -217,9 +219,13 @@ async function batched<T>(calls: readonly BatchCall[]): Promise<T[]> {
 async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<bigint, number>, events: EventCache): Promise<Snapshot> {
   const d = deployment!;
 
-  const [block, currentOps, incident, incidentReason, epoch, gateFloat, passCount, presetCount, tillQ] = await Promise.all([
+  const [block, currentOps, liveOrg, incident, incidentReason, epoch, gateFloat, passCount, presetCount, tillQ] = await Promise.all([
     publicClient.getBlock({ blockTag: "latest" }),
     publicClient.readContract({ address: d.parentRegistry, abi: permissionedRegistryAbi, functionName: "getSubregistry", args: ["ops"] }),
+    publicClient
+      .readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "org" })
+      .then((a) => a as Address)
+      .catch(() => d.org),
     publicClient.readContract({ address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "incident" }),
     publicClient.readContract({ address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "reason" }),
     publicClient.readContract({ address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "epoch" }),
@@ -418,6 +424,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
   return {
     blockTs,
     currentOps: currentOps as Address,
+    org: liveOrg,
     incident,
     incidentReason,
     tillQuarantined: tillQ.v,

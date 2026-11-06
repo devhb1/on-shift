@@ -25,7 +25,7 @@ contract ShiftGate {
     IERC20 public immutable USDC;
     bytes32 public immutable OPS_NODE;
     bytes32 public immutable TILL_NODE;
-    address public immutable ORG;
+    address public org;
 
     /// @dev keccak256(registry, labelId, expiry) => spent during that one registration
     mapping(bytes32 shiftKey => uint256) public spent;
@@ -75,6 +75,9 @@ contract ShiftGate {
     error UnknownOrder();
     error OverRefund(uint256 refundable);
     error TillNotLive();
+    error ZeroOrg();
+
+    event OrgTransferred(address indexed previous, address indexed next);
 
     constructor(
         IPermissionedRegistry parent,
@@ -82,14 +85,22 @@ contract ShiftGate {
         IERC20 usdc,
         bytes32 opsNode,
         bytes32 tillNode,
-        address org
+        address org_
     ) {
         PARENT = parent;
         TILL_RESOLVER = tillResolver;
         USDC = usdc;
         OPS_NODE = opsNode;
         TILL_NODE = tillNode;
-        ORG = org;
+        if (org_ == address(0)) revert ZeroOrg();
+        org = org_;
+    }
+
+    function transferOrg(address next) external {
+        if (msg.sender != org) revert NotOrg();
+        if (next == address(0)) revert ZeroOrg();
+        emit OrgTransferred(org, next);
+        org = next;
     }
 
     // ---------------------------------------------------------------- gated actions
@@ -211,7 +222,7 @@ contract ShiftGate {
     }
 
     function withdrawFloat(address to, uint256 amount) external {
-        if (msg.sender != ORG) revert NotOrg();
+        if (msg.sender != org) revert NotOrg();
         if (!USDC.transfer(to, amount)) revert TransferFailed();
         emit FloatWithdrawn(to, amount);
     }

@@ -59,7 +59,8 @@ contract PassIssuer {
     IVerifiableFactory public immutable FACTORY;
     address public immutable RESOLVER_IMPL;
     address public immutable TREASURY;
-    address public immutable ORG;
+    /// @dev Organisation authority. Transferable so a Safe can replace an EOA without redeploying.
+    address public org;
     bytes32 public immutable OPS_NODE;
     string public orgName;
     /// @dev DNS-encoded "ops.<orgName>", used for per-name resolver grants.
@@ -101,9 +102,12 @@ contract PassIssuer {
     error GasDripFailed();
     error UnknownPass();
     error NamespaceFrozen();
+    error ZeroOrg();
+
+    event OrgTransferred(address indexed previous, address indexed next);
 
     modifier onlyOrg() {
-        if (msg.sender != ORG) revert NotOrg();
+        if (msg.sender != org) revert NotOrg();
         _;
     }
 
@@ -112,14 +116,15 @@ contract PassIssuer {
         IVerifiableFactory factory,
         address resolverImpl,
         address treasury,
-        address org,
+        address org_,
         string memory orgName_
     ) {
         PARENT = parent;
         FACTORY = factory;
         RESOLVER_IMPL = resolverImpl;
         TREASURY = treasury;
-        ORG = org;
+        if (org_ == address(0)) revert ZeroOrg();
+        org = org_;
         orgName = orgName_;
         opsDnsName = NameHash.dnsEncode(string.concat("ops.", orgName_));
         OPS_NODE = NameHash.namehash(opsDnsName);
@@ -134,6 +139,12 @@ contract PassIssuer {
     }
 
     // ---------------------------------------------------------------- org administration
+
+    function transferOrg(address next) external onlyOrg {
+        if (next == address(0)) revert ZeroOrg();
+        emit OrgTransferred(org, next);
+        org = next;
+    }
 
     function setLead(address lead, uint32 dailyBudget, bool active) external onlyOrg {
         leads[lead] = Lead(dailyBudget, active);
@@ -246,7 +257,7 @@ contract PassIssuer {
                 node: OPS_NODE.child(label),
                 dnsName: NameHash.prepend(label, opsDnsName),
                 treasury: TREASURY,
-                org: ORG,
+                org: org,
                 holder: holder,
                 orgName: orgName,
                 roleName: preset.name,
@@ -265,7 +276,7 @@ contract PassIssuer {
         uint256 indexPlusOne = latestPassIndexPlusOne[keccak256(bytes(label))];
         if (indexPlusOne == 0) revert UnknownPass();
         Pass storage pass = _passes[indexPlusOne - 1];
-        if (msg.sender != ORG && msg.sender != pass.issuer) revert NotAuthorizedToRevoke();
+        if (msg.sender != org && msg.sender != pass.issuer) revert NotAuthorizedToRevoke();
         IPermissionedRegistry(pass.registry).unregister(NameHash.labelId(label));
         emit PassRevoked(indexPlusOne - 1, label, msg.sender);
     }

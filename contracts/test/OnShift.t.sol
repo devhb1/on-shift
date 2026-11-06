@@ -733,6 +733,29 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         assertTrue(shopB.gate.passStatus("shift-b").live);
     }
 
+    function test_TransferOrg_movesAuthorityWithoutRedeploy() public {
+        address safe = makeAddr("safe");
+        vm.startPrank(org);
+        s.issuer.transferOrg(safe);
+        s.gate.transferOrg(safe);
+        s.incidentSwitch.transferOrg(safe);
+        vm.stopPrank();
+
+        vm.prank(org);
+        vm.expectRevert(PassIssuer.NotOrg.selector);
+        s.issuer.setLead(lead, 1, true);
+
+        vm.prank(safe);
+        s.issuer.setLead(lead, 9, true);
+        (uint32 budget, bool active) = s.issuer.leads(lead);
+        assertEq(budget, 9);
+        assertTrue(active);
+
+        vm.prank(safe);
+        s.incidentSwitch.quarantineTill();
+        assertTrue(s.incidentSwitch.tillQuarantined());
+    }
+
     function test_UnregisteredOrg_cannotIssue() public {
         ShopFactory book = new ShopFactory(s.parent, org);
         assertFalse(book.isEnrolled("ghost"));

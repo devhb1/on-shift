@@ -73,7 +73,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const operatorRole: OperatorRole = useMemo(() => {
     if (!operator || !deployment) return "none";
-    if (sameAddress(operator.signer.address, deployment.org)) return "org";
+    const org = snapshot?.org ?? deployment.org;
+    if (sameAddress(operator.signer.address, org)) return "org";
     if (snapshot?.leads.some((l) => l.active && sameAddress(l.address, operator.signer.address))) return "lead";
     return "none";
   }, [operator, snapshot]);
