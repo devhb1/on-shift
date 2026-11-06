@@ -92,8 +92,14 @@ const OnShiftContext = createContext<Ctx>({ chainOffset: 0, refresh: async () =>
 
 export const labelId = (label: string) => BigInt(keccak256(toBytes(label)));
 
-/** ENS node of a pass name, e.g. shift-0412.ops.onshift.eth. */
-export const passNode = (label: string) => namehash(`${label}.ops.${deployment!.orgName}`);
+/** ENS node of a pass name, e.g. shift-0412.ops.onshift.eth or play-….demo.onshift.eth. */
+export const passNode = (label: string, ns: "ops" | "demo" = "ops") =>
+  namehash(`${label}.${ns}.${deployment!.orgName}`);
+
+/** Sandbox Playground names under demo.<org> — never treat as real staff. */
+export function isDemoPassName(name: string, orgName = deployment?.orgName ?? "onshift.eth") {
+  return name.toLowerCase().endsWith(`.demo.${orgName.toLowerCase()}`);
+}
 
 type RawPass = {
   label: string;

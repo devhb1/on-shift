@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { keccak256, toBytes, type Address } from "viem";
 import { normalize } from "viem/ens";
-import { AlertTriangle, BadgeCheck, Check, Clock3, Link2, ScanLine, Search, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Check, Clock3, FlaskConical, Link2, ScanLine, Search, ShieldAlert, X } from "lucide-react";
 import { Button, Countdown, Group, KV, NetworkNote, Sheet, Tile } from "../components/ui";
 import { publicClient } from "../lib/clients";
-import { labelId, passNode } from "../lib/onshift";
+import { isDemoPassName, labelId, passNode } from "../lib/onshift";
 import { deployment, explorerAddress, isLocal, networkLabel, UNIVERSAL_RESOLVER, VERIFIED_ORGS } from "../lib/config";
 import { clock, levenshtein, short, usdc } from "../lib/format";
 import { passIssuerAbi, permissionedRegistryAbi, permissionedResolverAbi, shiftGateAbi } from "../generated/abis";
@@ -16,6 +16,7 @@ type Result =
   | {
       kind: "pass";
       name: string;
+      demo: boolean;
       live: boolean;
       incident: boolean;
       issued: boolean;
@@ -44,9 +45,14 @@ type Proof = {
 const STATUS_NAMES = ["Available", "Reserved", "Registered"];
 const PROOF_KEYS = ["org", "role", "shift.status"];
 
-async function readProof(name: string, label: string): Promise<Proof> {
+async function readProof(name: string, label: string, ns: "ops" | "demo"): Promise<Proof> {
   const d = deployment!;
-  const registry = (await publicClient.readContract({ address: d.parentRegistry, abi: permissionedRegistryAbi, functionName: "getSubregistry", args: ["ops"] })) as Address;
+  const registry = (await publicClient.readContract({
+    address: d.parentRegistry,
+    abi: permissionedRegistryAbi,
+    functionName: "getSubregistry",
+    args: [ns],
+  })) as Address;
   const [state, resolver] = await Promise.all([
     publicClient.readContract({ address: registry, abi: permissionedRegistryAbi, functionName: "getState", args: [labelId(label)] }),
     publicClient.readContract({ address: registry, abi: permissionedRegistryAbi, functionName: "getResolver", args: [label] }),
@@ -100,10 +106,15 @@ export function Verify({ initialName }: { initialName: string }) {
       if (!name) return;
       if (!quiet) setLoading(true);
       try {
-        const suffix = `.ops.${d.orgName}`;
+        const opsSuffix = `.ops.${d.orgName}`;
+        const demoSuffix = `.demo.${d.orgName}`;
         let label: string;
+        let ns: "ops" | "demo" = "ops";
         if (!name.includes(".")) label = name;
-        else if (name.endsWith(suffix)) label = name.slice(0, -suffix.length);
+        else if (name.endsWith(demoSuffix)) {
+          label = name.slice(0, -demoSuffix.length);
+          ns = "demo";
+        } else if (name.endsWith(opsSuffix)) label = name.slice(0, -opsSuffix.length);
         else {
           const org = name.split(".").slice(-2).join(".");
           setResult({ kind: "foreign", name, org, lookalike: VERIFIED_ORGS.find((v) => v !== org && levenshtein(v, org) <= 2) });
@@ -113,13 +124,18 @@ export function Verify({ initialName }: { initialName: string }) {
           setResult({ kind: "invalid", name });
           return;
         }
+        // Bare labels that start with play- are sandbox names.
+        if (!name.includes(".") && label.startsWith("play-")) ns = "demo";
+        const suffix = ns === "demo" ? demoSuffix : opsSuffix;
         const fullName = `${label}${suffix}`;
+        const gate =
+          ns === "demo" ? ((d.sandboxGate as Address | undefined) ?? d.shiftGate) : d.shiftGate;
         const [status, indexPlusOne, opsStatus, block, proof] = await Promise.all([
-          publicClient.readContract({ address: d.shiftGate, abi: shiftGateAbi, functionName: "passStatus", args: [label] }),
+          publicClient.readContract({ address: gate, abi: shiftGateAbi, functionName: "passStatus", args: [label] }),
           publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "latestPassIndexPlusOne", args: [keccak256(toBytes(label))] }),
           publicClient.readContract({ address: d.parentResolver, abi: permissionedResolverAbi, functionName: "text", args: [d.orgNode, "ops.status"] }),
           publicClient.getBlockNumber(),
-          readProof(fullName, label),
+          readProof(fullName, label, ns),
         ]);
         const found = indexPlusOne > 0n;
         const pass = found
@@ -127,16 +143,17 @@ export function Verify({ initialName }: { initialName: string }) {
           : undefined;
         let role: string | undefined, agentContext: string | undefined;
         if (found) {
-          const node = passNode(label);
+          const node = passNode(label, ns);
           [role, agentContext] = await Promise.all(
             ["role", "agent-context"].map((k) => publicClient.readContract({ address: pass!.resolver, abi: permissionedResolverAbi, functionName: "text", args: [node, k] })),
           );
         }
         setResult({
           kind: "pass",
-          name: `${label}${suffix}`,
+          name: fullName,
+          demo: ns === "demo" || isDemoPassName(fullName, d.orgName),
           live: status.live,
-          incident: opsStatus === "incident",
+          incident: ns === "ops" && opsStatus === "incident",
           issued: found,
           revoked: found && !status.live && Number(status.expiry) > 0 && Number(status.expiry) < Number(pass!.expiry),
           expiry: Number(status.live ? status.expiry : pass ? pass.expiry : 0n),
@@ -304,6 +321,15 @@ function Verdict({ result }: { result: Result }) {
 
   return (
     <div className="stack" style={{ gap: 16 }}>
+      {result.demo && (
+        <div className="status-strip demo">
+          <Tile icon={FlaskConical} tint="orange" />
+          <div>
+            <div className="strip-title">DEMO PASS</div>
+            <div className="small secondary">Sandbox name under demo.{d.orgName}. Not real staff of {d.orgName}.</div>
+          </div>
+        </div>
+      )}
       {result.incident && (
         <div className="status-strip alert">
           <Tile icon={ShieldAlert} tint="red" />
@@ -315,15 +341,22 @@ function Verdict({ result }: { result: Result }) {
       )}
       <Group>
         <div className="verdict">
-          <div className={`seal ${on ? "green" : "red"}`}>{on ? <Check size={40} strokeWidth={3} /> : <X size={40} strokeWidth={3} />}</div>
-          <div className="verdict-title">{on ? "On shift" : "Not on shift"}</div>
+          <div className={`seal ${on ? (result.demo ? "orange" : "green") : "red"}`}>{on ? <Check size={40} strokeWidth={3} /> : <X size={40} strokeWidth={3} />}</div>
+          <div className="verdict-title">{on ? (result.demo ? "On shift (demo)" : "On shift") : "Not on shift"}</div>
           <div className="secondary" style={{ marginTop: 6, wordBreak: "break-all" }}>{result.name}</div>
           {!on && <p className="secondary small" style={{ marginTop: 8 }}>{why}</p>}
         </div>
         {on && (
           <KV
             rows={[
-              ["Works for", <span className="check-ok">{d.orgName} ✓</span>],
+              [
+                "Works for",
+                result.demo ? (
+                  <span className="check-warn">demo.{d.orgName} (sandbox)</span>
+                ) : (
+                  <span className="check-ok">{d.orgName} ✓</span>
+                ),
+              ],
               ["Role", result.role ?? "—"],
               ["On shift until", <>{clock(result.expiry)} · <Countdown expiry={result.expiry} /> left</>],
               ...(result.status ? ([["Note", result.status]] as [string, string][]) : []),

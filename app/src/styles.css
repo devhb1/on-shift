@@ -641,6 +641,16 @@ button.list-row:hover {
   color: var(--red);
 }
 
+.status-strip.demo {
+  background: var(--orange-tint);
+  box-shadow: none;
+}
+
+.status-strip.demo .strip-title {
+  color: var(--orange);
+  letter-spacing: 0.04em;
+}
+
 .strip-title {
   font-weight: 600;
 }
@@ -1345,6 +1355,10 @@ textarea.input {
   background: var(--green-solid);
 }
 
+.seal.orange {
+  background: var(--orange-solid);
+}
+
 .seal.red {
   background: var(--red-solid);
 }
@@ -1437,6 +1451,11 @@ textarea.input {
 
 .check-ok {
   color: var(--green);
+}
+
+.check-warn {
+  color: var(--orange);
+  font-weight: 600;
 }
 
 .check-no {
