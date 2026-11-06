@@ -7,6 +7,7 @@ import {IVerifiableFactory} from "../src/interfaces/IVerifiableFactory.sol";
 import {IPermissionedRegistry} from "../src/interfaces/IPermissionedRegistry.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {DeploymentWriter} from "./DeploymentWriter.sol";
+import {Playground} from "../src/Playground.sol";
 import {SepoliaENSv2} from "./SepoliaENSv2.sol";
 
 /// @notice Sepolia deployment on the REAL ENSv2 contracts (VerifiableFactory, UserRegistry and
@@ -40,11 +41,15 @@ contract DeploySepolia is Script, DeploymentWriter {
         s.issuer.setLead(lead, 50, true);
         if (lead != org) s.issuer.setLead(org, 10, true);
         MockUSDC(SepoliaENSv2.MOCK_USDC).mint(address(s.gate), 1_000e6); // ENSv2 testnet MockUSDC: open mint
+        Playground playground = new Playground(s.issuer);
+        s.issuer.setLead(address(playground), 200, true);
         vm.stopBroadcast();
 
         string memory path = _write(
             s, "sepolia", "https://sepolia.etherscan.io", orgName, startBlock, org, lead, agent, treasury
         );
+        _set("playground", address(playground));
+        _set("gateStartBlock", startBlock);
         console2.log("OnShift deployed on Sepolia ENSv2. Addresses written to", path);
     }
 }

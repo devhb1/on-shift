@@ -18,3 +18,4 @@ app/src/generated/deployments.json
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+contracts/broadcast/**/dry-run/

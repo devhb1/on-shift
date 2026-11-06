@@ -5,6 +5,7 @@ import {Script, console2} from "forge-std/Script.sol";
 import {IERC20} from "../src/interfaces/IERC20.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {DeploymentWriter} from "./DeploymentWriter.sol";
+import {Playground} from "../src/Playground.sol";
 
 /// @notice Local deployment: the ABI-compatible ENSv2 layer + OnShift on Anvil.
 ///
@@ -25,10 +26,14 @@ contract Deploy is Script, DeploymentWriter {
         System memory s = _deployOnShift(org, treasury, IERC20(address(usdc)), _deployLocalInfra(), ORG_NAME);
         s.issuer.setLead(lead, 25, true);
         s.issuer.setLead(org, 10, true);
-        usdc.mint(address(s.gate), 500e6); // the gate float = maximum blast radius
+        usdc.mint(address(s.gate), 500e6);
+        Playground playground = new Playground(s.issuer);
+        s.issuer.setLead(address(playground), 200, true);
         vm.stopBroadcast();
 
         string memory path = _write(s, "local", "", ORG_NAME, startBlock, org, lead, agent, treasury);
+        _set("playground", address(playground));
+        _set("gateStartBlock", startBlock);
         console2.log("OnShift deployed locally. Addresses written to", path);
     }
 }

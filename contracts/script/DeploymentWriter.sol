@@ -42,7 +42,22 @@ abstract contract DeploymentWriter is OnShiftDeployer {
         VM.serializeAddress(k, "passIssuer", address(s.issuer));
         VM.serializeAddress(k, "shiftGate", address(s.gate));
         string memory json = VM.serializeAddress(k, "incidentSwitch", address(s.incidentSwitch));
-        path = string.concat("./deployments/", VM.toString(block.chainid), ".json");
+        path = _path();
         VM.writeJson(json, path);
+    }
+
+    function _path() internal view returns (string memory) {
+        return string.concat("./deployments/", VM.toString(block.chainid), ".json");
+    }
+
+    /// @dev Add or replace one top-level key in the existing deployments file.
+    function _set(string memory key, address value) internal {
+        VM.serializeJson("patch", VM.readFile(_path()));
+        VM.writeJson(VM.serializeAddress("patch", key, value), _path());
+    }
+
+    function _set(string memory key, uint256 value) internal {
+        VM.serializeJson("patch", VM.readFile(_path()));
+        VM.writeJson(VM.serializeUint("patch", key, value), _path());
     }
 }
