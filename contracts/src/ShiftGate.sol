@@ -14,7 +14,9 @@ import {OnShiftTypes} from "./OnShiftTypes.sol";
 ///         3. caller must be latestOwner (latestOwner ignores expiry, hence step 2 first, C7)
 ///         4. scope = the pass resolver's issuer-only `pass.scope` data record, bound to this expiry
 ///
-///         The gate holds a small USDC float: that float is the maximum blast radius of the system.
+///         Refunds are bound to orders paid through `pay()`: the money can only go back to the wallet that
+///         paid, and never more than it paid. A pass holder cannot name the recipient, so the cap bounds
+///         mistakes and the order binding rules out self-dealing.
 contract ShiftGate {
     using NameHash for bytes32;
 
@@ -25,8 +27,15 @@ contract ShiftGate {
 
     /// @dev keccak256(registry, labelId, expiry) => spent during that one registration
     mapping(bytes32 shiftKey => uint256) public spent;
-    mapping(bytes32 orderId => bool) public orderDone;
+    mapping(bytes32 orderId => Order) public orders;
+    mapping(address payer => uint256) public orderNonce;
     mapping(bytes32 ticketId => bool) public ticketDone;
+
+    struct Order {
+        address payer;
+        uint128 paid;
+        uint128 refunded;
+    }
 
     struct PassStatus {
         bool live;
@@ -41,6 +50,7 @@ contract ShiftGate {
         string shiftStatus;
     }
 
+    event Paid(bytes32 indexed orderId, address indexed payer, uint256 amount);
     event Refunded(
         string label,
         address indexed holder,
@@ -59,6 +69,9 @@ contract ShiftGate {
     error Replay();
     error NotOrg();
     error TransferFailed();
+    error InvalidAmount();
+    error UnknownOrder();
+    error OverRefund(uint256 refundable);
 
     constructor(IPermissionedRegistry parent, IERC20 usdc, bytes32 opsNode, address org) {
         PARENT = parent;
@@ -69,16 +82,36 @@ contract ShiftGate {
 
     // ---------------------------------------------------------------- gated actions
 
-    function refund(string calldata label, address customer, uint256 amount, bytes32 orderId) external {
+    /// @notice A customer pays the shop. The order id is derived on chain so nobody can claim another's.
+    function pay(uint256 amount) external returns (bytes32 orderId) {
+        if (amount == 0 || amount > type(uint128).max) revert InvalidAmount();
+        orderId = keccak256(abi.encode(address(this), msg.sender, orderNonce[msg.sender]++));
+        orders[orderId] = Order(msg.sender, uint128(amount), 0);
+        if (!USDC.transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
+        emit Paid(orderId, msg.sender, amount);
+    }
+
+    /// @notice Refund part or all of a paid order, always to the wallet that paid it.
+    function refund(string calldata label, bytes32 orderId, uint256 amount) external {
         (bytes32 shiftKey, OnShiftTypes.Scope memory scope) = _authorize(label, OnShiftTypes.ACTION_REFUND);
-        if (orderDone[orderId]) revert Replay();
+        if (amount == 0) revert InvalidAmount();
+        Order storage order = orders[orderId];
+        address payer = order.payer;
+        if (payer == address(0)) revert UnknownOrder();
+        uint256 left = order.paid - order.refunded;
+        if (amount > left) revert OverRefund(left);
         uint256 used = spent[shiftKey];
         if (used + amount > scope.cap) revert OverCap(scope.cap - used);
 
-        orderDone[orderId] = true;
+        order.refunded += uint128(amount);
         spent[shiftKey] = used + amount;
-        if (!USDC.transfer(customer, amount)) revert TransferFailed();
-        emit Refunded(label, msg.sender, customer, amount, orderId);
+        if (!USDC.transfer(payer, amount)) revert TransferFailed();
+        emit Refunded(label, msg.sender, payer, amount, orderId);
+    }
+
+    function refundable(bytes32 orderId) external view returns (uint256) {
+        Order storage order = orders[orderId];
+        return order.paid - order.refunded;
     }
 
     function checkIn(string calldata label, bytes32 ticketId) external {

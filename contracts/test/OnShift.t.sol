@@ -64,9 +64,21 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         usdc.mint(address(s.gate), 500e6);
         vm.stopPrank();
         vm.deal(lead, 10 ether);
+        order = _pay(customer, 100e6);
     }
 
+    /// @dev A $100 order paid by `customer`, the one most refund tests draw on.
+    bytes32 internal order;
+
     // ---------------------------------------------------------------- helpers
+
+    function _pay(address payer, uint256 amount) internal returns (bytes32 orderId) {
+        usdc.mint(payer, amount);
+        vm.startPrank(payer);
+        usdc.approve(address(s.gate), amount);
+        orderId = s.gate.pay(amount);
+        vm.stopPrank();
+    }
 
     function _issue(string memory label, address holder, uint8 preset, uint64 duration, uint256 cap)
         internal
@@ -279,33 +291,84 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
     function test_Gate_refundWithinCap() public {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         vm.prank(staff);
-        s.gate.refund("shift-0412", customer, 10e6, "order-1");
+        s.gate.refund("shift-0412", order, 10e6);
         assertEq(usdc.balanceOf(customer), 10e6);
+        assertEq(s.gate.refundable(order), 90e6);
+    }
+
+    /// The pass holder never names the recipient: money only goes back to the wallet that paid.
+    function test_Gate_refundGoesOnlyToThePayer() public {
+        _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
+        uint256 staffBefore = usdc.balanceOf(staff);
+        vm.prank(staff);
+        s.gate.refund("shift-0412", order, 50e6);
+        assertEq(usdc.balanceOf(customer), 50e6);
+        assertEq(usdc.balanceOf(staff), staffBefore);
+    }
+
+    /// A cashier who wants the float has to pay it in first, so self-dealing nets to zero.
+    function test_Gate_selfDealingNetsToZero() public {
+        _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
+        bytes32 own = _pay(attacker, 20e6);
+        uint256 gateBefore = usdc.balanceOf(address(s.gate));
+        vm.prank(staff);
+        s.gate.refund("shift-0412", own, 20e6);
+        assertEq(usdc.balanceOf(attacker), 20e6);
+        assertEq(usdc.balanceOf(address(s.gate)), gateBefore - 20e6);
+        assertEq(gateBefore - 20e6, 500e6 + 100e6, "the float is untouched");
+    }
+
+    function test_Gate_unknownOrderReverts() public {
+        _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
+        vm.prank(staff);
+        vm.expectRevert(ShiftGate.UnknownOrder.selector);
+        s.gate.refund("shift-0412", keccak256("made-up"), 1e6);
+    }
+
+    function test_Pay_orderIdsAreUniquePerPayer() public {
+        bytes32 a = _pay(customer, 1e6);
+        bytes32 b = _pay(customer, 1e6);
+        bytes32 c = _pay(attacker, 1e6);
+        assertTrue(a != b && a != c && b != c && a != order);
+        (address payer, uint128 paid, uint128 refunded) = s.gate.orders(a);
+        assertEq(payer, customer);
+        assertEq(paid, 1e6);
+        assertEq(refunded, 0);
+
+        vm.prank(customer);
+        vm.expectRevert(ShiftGate.InvalidAmount.selector);
+        s.gate.pay(0);
     }
 
     function test_Gate_overCapReverts() public {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         vm.startPrank(staff);
-        s.gate.refund("shift-0412", customer, 40e6, "order-1");
+        s.gate.refund("shift-0412", order, 40e6);
         vm.expectRevert(abi.encodeWithSelector(ShiftGate.OverCap.selector, 10e6));
-        s.gate.refund("shift-0412", customer, 11e6, "order-2");
+        s.gate.refund("shift-0412", order, 11e6);
         vm.stopPrank();
     }
 
-    function test_Gate_replayReverts() public {
+    /// Partial refunds add up to the order and no further, across passes.
+    function test_Gate_cannotRefundMoreThanPaid() public {
+        bytes32 small = _pay(customer, 5e6);
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
-        vm.startPrank(staff);
-        s.gate.refund("shift-0412", customer, 1e6, "order-1");
-        vm.expectRevert(ShiftGate.Replay.selector);
-        s.gate.refund("shift-0412", customer, 1e6, "order-1");
-        vm.stopPrank();
+        _issue("shift-0413", staff2, CASHIER, 4 hours, 50e6);
+        vm.prank(staff);
+        s.gate.refund("shift-0412", small, 3e6);
+        vm.prank(staff2);
+        vm.expectRevert(abi.encodeWithSelector(ShiftGate.OverRefund.selector, 2e6));
+        s.gate.refund("shift-0413", small, 3e6);
+        vm.prank(staff2);
+        s.gate.refund("shift-0413", small, 2e6);
+        assertEq(s.gate.refundable(small), 0);
     }
 
     function test_Gate_wrongHolderReverts() public {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         vm.prank(attacker);
         vm.expectRevert(ShiftGate.NotPassHolder.selector);
-        s.gate.refund("shift-0412", attacker, 1e6, "order-1");
+        s.gate.refund("shift-0412", order, 1e6);
     }
 
     function test_Gate_actionNotInScopeReverts() public {
@@ -313,7 +376,7 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         vm.startPrank(staff);
         s.gate.checkIn("door-1", "ticket-1");
         vm.expectRevert(ShiftGate.ActionNotAllowed.selector);
-        s.gate.refund("door-1", customer, 1, "order-1");
+        s.gate.refund("door-1", order, 1);
         vm.stopPrank();
     }
 
@@ -326,7 +389,7 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(staff);
         vm.expectRevert(ShiftGate.PassNotLive.selector);
-        s.gate.refund("shift-0412", customer, 1e6, "order-1");
+        s.gate.refund("shift-0412", order, 1e6);
 
         // registry view of an expired pass (C3 / C7)
         IPermissionedRegistry.State memory st = ops.getState(NameHash.labelId("shift-0412"));
@@ -354,7 +417,7 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(staff);
         vm.expectRevert(ShiftGate.PassNotLive.selector);
-        s.gate.refund("shift-0412", customer, 1e6, "order-1");
+        s.gate.refund("shift-0412", order, 1e6);
 
         _issue("shift-0413", staff, CASHIER, 4 hours, 50e6);
         vm.prank(org);
@@ -376,14 +439,14 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(staff);
         vm.expectRevert(ShiftGate.ScopeMismatch.selector);
-        s.gate.refund("shift-0412", customer, 1e6, "order-1");
+        s.gate.refund("shift-0412", order, 1e6);
     }
 
     /// C7: token IDs change on re-registration; spend is tracked per registration, keyed by labelhash.
     function test_Reissue_newTokenIdAndFreshSpend() public {
         uint256 t1 = _issue("shift-0412", staff, CASHIER, 90 seconds, 10e6);
         vm.prank(staff);
-        s.gate.refund("shift-0412", customer, 10e6, "o-1");
+        s.gate.refund("shift-0412", order, 10e6);
 
         vm.warp(block.timestamp + 91 seconds);
         uint256 t2 = _issue("shift-0412", staff2, CASHIER, 1 hours, 10e6);
@@ -392,10 +455,10 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(staff); // the old holder is not the holder any more
         vm.expectRevert(ShiftGate.NotPassHolder.selector);
-        s.gate.refund("shift-0412", customer, 1e6, "o-2");
+        s.gate.refund("shift-0412", order, 1e6);
 
         vm.prank(staff2);
-        s.gate.refund("shift-0412", customer, 10e6, "o-3");
+        s.gate.refund("shift-0412", order, 10e6);
     }
 
     // ---------------------------------------------------------------- break-glass
@@ -414,10 +477,10 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(staff);
         vm.expectRevert(ShiftGate.PassNotLive.selector);
-        s.gate.refund("shift-0412", customer, 1e6, "o-1");
+        s.gate.refund("shift-0412", order, 1e6);
         vm.prank(agent);
         vm.expectRevert(ShiftGate.PassNotLive.selector);
-        s.gate.refund("agent-7", customer, 1e6, "o-2");
+        s.gate.refund("agent-7", order, 1e6);
 
         assertEq(s.parentResolver.text(s.orgNode, "ops.status"), "incident");
         assertEq(s.parentResolver.text(s.orgNode, "ops.incident"), "Support desk phishing wave");
@@ -440,12 +503,12 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(staff);
         vm.expectRevert(ShiftGate.PassNotLive.selector);
-        s.gate.refund("shift-0412", customer, 1e6, "o-1");
+        s.gate.refund("shift-0412", order, 1e6);
 
         // issuance works again, into the new namespace
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         vm.prank(staff);
-        s.gate.refund("shift-0412", customer, 1e6, "o-1");
+        s.gate.refund("shift-0412", order, 1e6);
     }
 
     function test_IncidentSwitch_holdsOnlyKeyScopedTextRights() public {
@@ -460,7 +523,7 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
     function test_PassStatus_view() public {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         vm.prank(staff);
-        s.gate.refund("shift-0412", customer, 7e6, "o-1");
+        s.gate.refund("shift-0412", order, 7e6);
 
         ShiftGate.PassStatus memory p = s.gate.passStatus("shift-0412");
         assertTrue(p.live);
@@ -483,12 +546,32 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         for (uint256 i; i < amounts.length; ++i) {
             uint256 amount = bound(amounts[i], 0, 60e6);
             vm.prank(staff);
-            try s.gate.refund("shift-fuzz", customer, amount, bytes32(i + 1)) {
+            try s.gate.refund("shift-fuzz", order, amount) {
                 paid += amount;
             } catch {}
         }
         assertLe(paid, cap);
         assertEq(usdc.balanceOf(customer), paid);
+    }
+
+    /// Two passes refunding the same order can never return more than the customer paid.
+    function testFuzz_refundsNeverExceedPayment(uint64 price, uint64[6] memory amounts) public {
+        price = uint64(bound(price, 1, 60e6));
+        bytes32 o = _pay(attacker, price);
+        _issue("shift-a", staff, CASHIER, 4 hours, 50e6);
+        _issue("shift-b", staff2, CASHIER, 4 hours, 50e6);
+        uint256 back;
+        for (uint256 i; i < amounts.length; ++i) {
+            uint256 amount = bound(amounts[i], 0, 40e6);
+            address who = i % 2 == 0 ? staff : staff2;
+            vm.prank(who);
+            try s.gate.refund(i % 2 == 0 ? "shift-a" : "shift-b", o, amount) {
+                back += amount;
+            } catch {}
+        }
+        assertLe(back, price);
+        assertEq(usdc.balanceOf(attacker), back);
+        assertEq(s.gate.refundable(o), price - back);
     }
 }
 
