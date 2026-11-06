@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "export": "node scripts/export-abis.mjs",
+    "test:sdk": "NODE_PATH=./app/node_modules node --test sdk/gate.test.mjs",
     "test": "cd contracts && forge test --no-match-contract SepoliaFork -vv",
     "test:gas": "cd contracts && forge test --gas-report",
     "build": "cd contracts && forge build && cd .. && npm run export && npm --workspace app run build",

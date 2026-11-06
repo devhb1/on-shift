@@ -8,8 +8,12 @@
     ".": "./gate.mjs"
   },
   "files": [
-    "gate.mjs"
+    "gate.mjs",
+    "abis.json"
   ],
+  "scripts": {
+    "test": "node --test --experimental-test-module-mocks gate.test.mjs"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=20"

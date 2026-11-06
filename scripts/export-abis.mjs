@@ -30,6 +30,16 @@ for (const name of contracts) {
 }
 writeFileSync(join(target, "abis.ts"), abis);
 
+const sdkAbis = {};
+for (const name of contracts) {
+  const file = join(out, `${name}.sol`, `${name}.json`);
+  if (!existsSync(file)) continue;
+  sdkAbis[name] = JSON.parse(readFileSync(file, "utf8")).abi;
+}
+const sdkTarget = join(root, "sdk");
+mkdirSync(sdkTarget, { recursive: true });
+writeFileSync(join(sdkTarget, "abis.json"), JSON.stringify(sdkAbis, null, 2) + "\n");
+
 const deployments = {};
 if (existsSync(deploymentsDir)) {
   for (const f of readdirSync(deploymentsDir).filter((f) => f.endsWith(".json"))) {
@@ -38,4 +48,6 @@ if (existsSync(deploymentsDir)) {
   }
 }
 writeFileSync(join(target, "deployments.json"), JSON.stringify(deployments, null, 2) + "\n");
-console.log(`Exported ${contracts.length} ABIs and ${Object.keys(deployments).length} deployment(s) to app/src/generated`);
+console.log(
+  `Exported ${contracts.length} ABIs and ${Object.keys(deployments).length} deployment(s) to app/src/generated; sdk/abis.json (${Object.keys(sdkAbis).length})`
+);
