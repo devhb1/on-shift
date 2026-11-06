@@ -14,3 +14,4 @@ contracts/deployments/31337.json
 
 # Generated for the local chain by scripts/export-abis.mjs
 app/src/generated/deployments.json
+*.recovery.lock
