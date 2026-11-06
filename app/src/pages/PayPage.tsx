@@ -7,6 +7,7 @@ import { send } from "../lib/tx";
 import { publicClient } from "../lib/clients";
 import { deployment, isLocal } from "../lib/config";
 import { clock, sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
+import { resolveTill, type TillView } from "../lib/till";
 import { mockUSDCAbi, shiftGateAbi } from "../generated/abis";
 import { ThemeToggle, navigate } from "../App";
 
@@ -21,6 +22,7 @@ export function PayPage() {
   const [amount, setAmount] = useState("10");
   const [balance, setBalance] = useState<bigint>();
   const [latest, setLatest] = useState<`0x${string}`>();
+  const [till, setTill] = useState<TillView>();
 
   const mine: Order[] = (snapshot?.orders ?? []).filter((o) => sameAddress(o.payer, me));
   const shown = latest ? mine.find((o) => o.orderId === latest) : undefined;
@@ -41,6 +43,16 @@ export function PayPage() {
     };
   }, [me, d.usdc, snapshot]);
 
+  useEffect(() => {
+    let stop = false;
+    resolveTill()
+      .then((view) => !stop && setTill(view))
+      .catch(() => !stop && setTill(undefined));
+    return () => {
+      stop = true;
+    };
+  }, [d.orgName, d.parentResolver, snapshot?.tillQuarantined]);
+
   const units = (() => {
     try {
       return toUsdcUnits(amount);
@@ -57,10 +69,13 @@ export function PayPage() {
     await run(
       "pay",
       async () => {
-        const allowance = await publicClient.readContract({ address: d.usdc, abi: mockUSDCAbi, functionName: "allowance", args: [me, d.shiftGate] });
-        if (allowance < units) await send(operator.signer, { address: d.usdc, abi: mockUSDCAbi, functionName: "approve", args: [d.shiftGate, units] });
-        const receipt = await send(operator.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "pay", args: [units] });
-        const paid = receipt.logs.find((l) => sameAddress(l.address, d.shiftGate) && l.topics.length === 3);
+        const view = till ?? (await resolveTill());
+        if (view.quarantined) throw new Error("Till is quarantined");
+        const gate = view.gate;
+        const allowance = await publicClient.readContract({ address: d.usdc, abi: mockUSDCAbi, functionName: "allowance", args: [me, gate] });
+        if (allowance < units) await send(operator.signer, { address: d.usdc, abi: mockUSDCAbi, functionName: "approve", args: [gate, units] });
+        const receipt = await send(operator.signer, { address: gate, abi: shiftGateAbi, functionName: "pay", args: [units] });
+        const paid = receipt.logs.find((l) => sameAddress(l.address, gate) && l.topics.length === 3);
         if (paid?.topics[1]) setLatest(paid.topics[1]);
         return receipt;
       },
@@ -113,7 +128,10 @@ export function PayPage() {
                     <span className="suffix">{unit}</span>
                   </div>
                 </Field>
-                <Button block variant="primary" disabled={busy !== null || units <= 0n || (balance !== undefined && balance < units)} onClick={pay}>
+                {till?.quarantined && <p className="small secondary" style={{ marginBottom: 8 }}>till.{d.orgName} is quarantined. New payments are refused. A refund of an order you already paid still comes back here.</p>}
+                {till?.stale && <p className="small secondary" style={{ marginBottom: 8 }}>The cached gate is stale. This payment goes to {short(till.gate)}, the address till.{d.orgName} resolves to.</p>}
+                {!till?.published && till && !till.quarantined && <p className="small secondary" style={{ marginBottom: 8 }}>This deployment has not published an address on till.{d.orgName}. Paying the cached gate.</p>}
+                <Button block variant="primary" disabled={busy !== null || units <= 0n || till?.quarantined || (balance !== undefined && balance < units)} onClick={pay}>
                   {busy === "pay" ? "Paying…" : `Pay ${usdc(units)}`}
                 </Button>
                 {balance !== undefined && balance < units && <p className="small secondary" style={{ marginTop: 8 }}>Not enough {unit}. Get some above first.</p>}

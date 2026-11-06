@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { keccak256, toBytes } from "viem";
+import { getAddress, keccak256, namehash, toBytes } from "viem";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -17,6 +17,53 @@ export function abi(name) {
 
 export function labelId(label) {
   return BigInt(keccak256(toBytes(label)));
+}
+
+const RESOLVER_READS = [
+  {
+    type: "function",
+    name: "text",
+    stateMutability: "view",
+    inputs: [
+      { name: "node", type: "bytes32" },
+      { name: "key", type: "string" },
+    ],
+    outputs: [{ type: "string" }],
+  },
+  {
+    type: "function",
+    name: "addr",
+    stateMutability: "view",
+    inputs: [
+      { name: "node", type: "bytes32" },
+      { name: "coinType", type: "uint256" },
+    ],
+    outputs: [{ type: "bytes" }],
+  },
+];
+
+function addressFromAddr(raw) {
+  if (!raw || raw === "0x") return undefined;
+  const body = String(raw).toLowerCase().replace(/^0x/, "");
+  if (body.length < 40 || /^0+$/.test(body)) return undefined;
+  return getAddress(`0x${body.slice(-40)}`);
+}
+
+/** The gate a stranger should call, read from till.<org> rather than a cached address. */
+export async function resolveTill(publicClient, d) {
+  const node = namehash(`till.${d.orgName}`);
+  const [status, raw] = await Promise.all([
+    publicClient.readContract({ address: d.parentResolver, abi: RESOLVER_READS, functionName: "text", args: [node, "till.status"] }),
+    publicClient.readContract({ address: d.parentResolver, abi: RESOLVER_READS, functionName: "addr", args: [node, 60n] }),
+  ]);
+  const published = addressFromAddr(raw);
+  return {
+    gate: published ?? d.shiftGate,
+    status,
+    quarantined: status === "quarantine",
+    published: Boolean(published),
+    stale: Boolean(published && published.toLowerCase() !== String(d.shiftGate).toLowerCase()),
+  };
 }
 
 /**

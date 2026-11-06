@@ -4,7 +4,7 @@
 // Exit 0 = live, will transact. Exit 2 = refuse.
 import { createPublicClient, http } from "viem";
 import { sepolia } from "viem/chains";
-import { checkPass, loadDeployment } from "../sdk/gate.mjs";
+import { checkPass, loadDeployment, resolveTill } from "../sdk/gate.mjs";
 
 const raw = process.argv[2];
 if (!raw) {
@@ -20,6 +20,11 @@ const pub = createPublicClient({
 });
 
 const verdict = await checkPass(pub, d, label);
+const till = await resolveTill(pub, d).catch(() => undefined);
+if (till?.quarantined) {
+  console.log(`counterparty: refuse ${verdict.name} (till quarantined)`);
+  process.exit(2);
+}
 if (!verdict.live) {
   console.log(`counterparty: refuse ${verdict.name} (not on shift)`);
   process.exit(2);
