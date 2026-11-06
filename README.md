@@ -13,7 +13,7 @@
 ![ENS](https://img.shields.io/badge/onshift.eth-registered-5856d6)
 ![License](https://img.shields.io/badge/license-MIT-8e8e93)
 
-<img src="media/dashboard.jpg" alt="OnShift console" width="880" />
+<img src="docs/screenshots/dashboard.jpg" alt="OnShift console" width="880" />
 
 </div>
 
@@ -37,8 +37,8 @@ Outsiders have it worse. A customer has **no reliable way to check** whether the
 
 <table>
 <tr>
-<td width="34%"><img src="media/staff-app.jpg" alt="Staff app" /></td>
-<td width="66%"><img src="media/passes.jpg" alt="Passes with inspector" /><br/><img src="media/verify.jpg" alt="Public check" /></td>
+<td width="34%"><img src="docs/screenshots/staff-app.jpg" alt="Staff app" /></td>
+<td width="66%"><img src="docs/screenshots/passes.jpg" alt="Passes with inspector" /><br/><img src="docs/screenshots/verify.jpg" alt="Public check" /></td>
 </tr>
 <tr>
 <td align="center"><b>Staff App</b> — a Wallet-style pass on the holder's own device, with refund, check-in and status. The Security Check shows the chain refusing what a stolen phone would try.</td>
@@ -149,7 +149,7 @@ Every gated action re-derives authority from ENS, on every call:
 | C7 | Token IDs are mutable. | Everything is keyed by labelhash; spend is tracked per `(registry, labelhash, expiry)`. | `test_Reissue_newTokenIdAndFreshSpend` |
 | C8 | Text roles granted at the root cover every name and key. | `IncidentSwitch` gets `authorizeTextRoles` for two records of the org name only. | `test_IncidentSwitch_holdsOnlyKeyScopedTextRights` |
 
-**The same 37 tests run twice:** 35 named tests plus 2 fuzz tests, against the local ABI-compatible layer, and again against the **real ENSv2 contracts on a Sepolia fork** (`test/SepoliaFork.t.sol`, skipped when `SEPOLIA_RPC_URL` is unset).
+**The same 25 tests run twice:** against the local ABI-compatible layer, and against the **real ENSv2 contracts on a Sepolia fork** (`test/SepoliaFork.t.sol`).
 
 ### Found while deploying: Sepolia's code-deposit cost
 
@@ -186,7 +186,7 @@ On **Sepolia** the console signs with your browser wallet ("Connect Wallet"). St
 The product does not need a local chain. Node.js 20+ is enough:
 
 ```bash
-git clone --recursive https://github.com/devhb1/on-shift.git onshift && cd onshift
+git clone --recursive <this repo> onshift && cd onshift
 npm install
 npm run build:web
 npm --workspace app run preview
@@ -199,8 +199,8 @@ Open **http://localhost:5173**. Overview, passes, activity, and Public Check are
 | Command | What it does |
 |---|---|
 | `npm run dev` | Local chain + deploy + app |
-| `npm test` | 37 Foundry tests on the local ENSv2 layer (35 named, 2 fuzz) |
-| `npm run test:fork` | The same 37 tests against the real ENSv2 contracts on a Sepolia fork |
+| `npm test` | 25 Foundry tests on the local ENSv2 layer, including a fuzz test |
+| `npm run test:fork` | The same 25 tests against the real ENSv2 contracts on a Sepolia fork |
 | `npm run agent` | An AI agent gets a $20 pass and refunds until `OverCap` (local) |
 | `npm run deploy:sepolia` | Deploy OnShift on Sepolia ENSv2 |
 | `npm run register:sepolia` | Register `<org>.eth` via the ENSv2 ETHRegistrar (commit → wait → register) |
@@ -226,17 +226,9 @@ A stolen staff phone is bounded by the remaining limit of one shift, a stolen le
 
 On Sepolia the "org multisig" is a single deployer EOA. In production it would be a Safe.
 
-## Submission
+## Docs
 
-Classic **From Scratch** track. Partner prize: **ENS — Best Use of ENSv2** (Sepolia). Do not also enter **Best Integration of ENSv2 into an Existing Project**. That prize is Continuity-only and requires Ethereum mainnet.
-
-**New in this repository:** `PassIssuer`, `PassResolverLib`, `ShiftGate`, `IncidentSwitch`, `Playground`, the app, and the Sepolia deploy, register, and smoke scripts. `contracts/src/ensv2-local/` is a test double with the same ABI and role bits so `npm test` can run without a fork. The product does not use it. Sepolia calls the ENSv2 contracts pinned in `contracts/script/SepoliaENSv2.sol`.
-
-**Reused, not vendored:** ENSv2 UserRegistry, Permissioned Resolver, VerifiableFactory, ETHRegistrar, and UniversalResolverV2, deployed by ENS on Sepolia. forge-std (git submodule). React, Vite, viem, lucide-react, and qrcode, listed in `app/package.json`.
-
-**AI tools:** Cursor assisted drafting and editing of the contracts, tests, app, and Sepolia scripts. The team directed the work and reviewed the diffs. No spec-kit, OpenSpec, or Kiro files were used, so there is no prompt archive to commit. Say the same thing, in your own words, on the submission form.
-
-The showcase form also asks for a live demo link (`npm run build:web` is what Vercel runs) and, if you upload one, a demo video at 720p or higher, between 2:00 and 4:00, with a person speaking. ETHGlobal rejects videos that are sped up, recorded on a phone, set to music with text instead of speech, or voiced by a text-to-speech tool.
+- [ETHGlobal Mumbai](docs/ETHGLOBAL.md) — what is new, what is reused, and where AI tools assisted
 
 ## License
 
