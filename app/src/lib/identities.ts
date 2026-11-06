@@ -37,7 +37,6 @@ export const LOCAL_OPERATORS: Operator[] =
       ]
     : [];
 
-export const CUSTOMER_ADDRESS: Address = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
 export const ATTACKER_ADDRESS: Address = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65";
 
 const STORAGE_KEY = `onshift.devices.${CHAIN_ID}.v2`;
