@@ -173,19 +173,22 @@ Three surfaces, each for a different person:
 | **Staff App** (`#/device`) | The person or agent holding a pass | Device setup code, a Wallet-style pass with countdown and QR, Refund / Check In / Status, what the pass can and can't do, and a gas-free Security Check |
 | **Public Check** (`#/verify`) | Customers, anyone | One question, one answer, no login. Shareable links and QR codes. |
 
-On **Sepolia** the console signs with your browser wallet ("Connect Wallet"). Staff and agent devices keep a burner key in the browser, funded by the gas allowance sent with the pass. On the **local** chain, demo identities are Anvil's public dev keys. Switch networks on the Deployment page.
+On **Sepolia** the console signs with your browser wallet ("Connect Wallet"). Staff and agent devices keep a burner key in the browser, funded by the gas allowance sent with the pass. The app defaults to that live deployment. Anvil is a test harness, used only by `npm run dev` and `npm test`.
 
 ## Quickstart
 
-Requirements: [Foundry](https://getfoundry.sh) and Node.js 20+.
+The product does not need a local chain. Node.js 20+ is enough:
 
 ```bash
 git clone --recursive <this repo> onshift && cd onshift
 npm install
-npm run dev
+npm run build:web
+npm --workspace app run preview
 ```
 
-`npm run dev` starts Anvil with one-second blocks, deploys everything, exports addresses and ABIs, and serves the app at **http://localhost:5173**. The app reads both the local and the Sepolia deployment.
+Open **http://localhost:5173**. Overview, passes, activity, and Public Check are read from the Sepolia contracts above. Connect the organisation wallet to issue a pass. Nothing in the UI is a fixture.
+
+`npm run dev` is the Anvil harness (Foundry required). It does not replace the Sepolia deployment.
 
 | Command | What it does |
 |---|---|
@@ -196,6 +199,7 @@ npm run dev
 | `npm run deploy:sepolia` | Deploy OnShift on Sepolia ENSv2 |
 | `npm run register:sepolia` | Register `<org>.eth` via the ENSv2 ETHRegistrar (commit → wait → register) |
 | `npm run smoke:sepolia` | The live end-to-end check above |
+| `npm run build:web` | Production app against the committed Sepolia deployment. No Foundry. This is what Vercel runs. |
 | `npm run build` | Contracts, ABI export, typecheck and production build |
 
 Sepolia commands read `SEPOLIA_PRIVATE_KEY` and `SEPOLIA_RPC_URL` from `contracts/.env` (gitignored).
@@ -223,6 +227,7 @@ On Sepolia the "org multisig" is a single deployer EOA. In production it would b
 - [Threat model](docs/THREAT_MODEL.md)
 - [Demo script](docs/DEMO_SCRIPT.md) — 4 minutes
 - [Judge Q&A](docs/JUDGE_QA.md)
+- [ETHGlobal Mumbai](docs/ETHGLOBAL.md) — what is new, what is reused, and where AI tools assisted
 
 ## License
 
