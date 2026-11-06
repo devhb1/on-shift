@@ -8,7 +8,7 @@
 
 `shift-0412.ops.onshift.eth` proves to any wallet or contract that its holder acts for **onshift.eth** *right now*, lets them touch only what you allow, can never be transferred, and stops working by itself when the shift ends. Refunds are bound to the paying wallet. Nobody has to remember to revoke it.
 
-![Tests](https://img.shields.io/badge/tests-34%20local%20%2B%2034%20on%20real%20ENSv2%20fork-34c759)
+![Tests](https://img.shields.io/badge/tests-37%20local%20%2B%2037%20on%20real%20ENSv2%20fork-34c759)
 ![Sepolia](https://img.shields.io/badge/live-Sepolia%20ENSv2-0071e3)
 ![ENS](https://img.shields.io/badge/onshift.eth-registered-5856d6)
 ![License](https://img.shields.io/badge/license-MIT-8e8e93)
@@ -125,8 +125,6 @@ Every gated action re-derives authority from ENS, on every call:
 3. The caller must be `latestOwner` (which ignores expiry, hence step 2 first).
 4. The scope (limit, allowed actions) comes from the pass's own resolver. Only the issuer writes it, and it must match this exact registration's expiry.
 
-More diagrams: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
-
 ## ENSv2 features doing real work
 
 | ENSv2 feature | Role in OnShift |
@@ -224,17 +222,12 @@ Sepolia commands read `SEPOLIA_PRIVATE_KEY` and `SEPOLIA_RPC_URL` from `contract
 
 ## Security
 
-Threat model and trust assumptions: **[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)**. In short: a stolen staff phone is bounded by the remaining limit of one shift, a stolen lead key by `budget × limit`, anything wider by break-glass, and everything by the gate float.
+A stolen staff phone is bounded by the remaining limit of one shift, a stolen lead key by `budget × limit`, anything wider by break-glass, and everything by the gate float.
 
 On Sepolia the "org multisig" is a single deployer EOA. In production it would be a Safe.
 
 ## Docs
 
-- [Architecture](docs/ARCHITECTURE.md) — topology, sequence, lifecycle, permission matrix
-- [ENSv2 integration](docs/ENSV2_MAPPING.md) — exactly which ENSv2 contracts and calls are used
-- [Threat model](docs/THREAT_MODEL.md)
-- [Demo script](docs/DEMO_SCRIPT.md) — 4 minutes
-- [Judge Q&A](docs/JUDGE_QA.md)
 - [ETHGlobal Mumbai](docs/ETHGLOBAL.md) — what is new, what is reused, and where AI tools assisted
 
 ## License
