@@ -150,6 +150,9 @@ abstract contract OnShiftDeployer {
         s.parentResolver.setText(s.orgNode.child("quarantine"), OnShiftTypes.KEY_TILL_STATUS, "quarantine");
 
         s.gate = new ShiftGate(s.parent, s.parentResolver, usdc, s.opsNode, tillNode, org);
+        // Clients that resolve till.<org> get this gate. quarantine.<org> has no address, so once
+        // the till name is aliased there, resolution no longer returns a payable contract.
+        s.parentResolver.setAddr(tillNode, OnShiftTypes.COIN_TYPE_ETH, abi.encodePacked(address(s.gate)));
 
         s.incidentSwitch = new IncidentSwitch(
             s.parent,

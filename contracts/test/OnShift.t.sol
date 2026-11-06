@@ -527,6 +527,7 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         assertTrue(s.gate.tillLive());
         assertEq(s.parentResolver.text(s.orgNode.child("till"), "till.status"), "live");
+        assertEq(s.parentResolver.addr(s.orgNode.child("till"), 60), abi.encodePacked(address(s.gate)));
 
         vm.prank(attacker);
         vm.expectRevert(IncidentSwitch.NotWatchtower.selector);
@@ -537,6 +538,8 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         assertFalse(s.gate.tillLive());
         assertEq(s.parentResolver.text(s.orgNode.child("till"), "till.status"), "quarantine");
+        // quarantine.<org> publishes no address, and addr() follows the alias
+        assertEq(s.parentResolver.addr(s.orgNode.child("till"), 60).length, 0);
         // resolver-level alias: till.<org> now serves quarantine.<org>'s records
         assertEq(
             keccak256(s.parentResolver.getAlias(NameHash.dnsEncode("till.onshift.eth"))),
