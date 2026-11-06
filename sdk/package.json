@@ -1,0 +1,20 @@
+{
+  "name": "@onshift/gate",
+  "version": "0.2.0",
+  "description": "Read-only ENSv2 + ShiftGate checks. Refuse a dead pass or a quarantined till.",
+  "type": "module",
+  "main": "gate.mjs",
+  "exports": {
+    ".": "./gate.mjs"
+  },
+  "files": [
+    "gate.mjs"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "viem": "^2.0.0"
+  }
+}

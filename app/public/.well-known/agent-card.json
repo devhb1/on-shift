@@ -1,16 +1,24 @@
 {
   "name": "OnShift counterparty",
   "description": "I only transact with live *.ops.onshift.eth names. Expired, revoked, or quarantined operators are refused for free.",
-  "url": "https://github.com/devhb1/onshift",
+  "url": "https://github.com/devhb1/on-shift",
   "skills": [
     {
       "id": "check-shift",
-      "description": "Read ENSv2 getState and ShiftGate.passStatus. No keys. Same questions the till asks."
+      "description": "Read ENSv2 getState, till.status, and ShiftGate.passStatus. No keys. Same questions the till asks."
     }
   ],
   "capabilities": {
     "streaming": false
   },
   "defaultInputModes": ["text"],
-  "defaultOutputModes": ["text"]
+  "defaultOutputModes": ["text"],
+  "provider": {
+    "organization": "OnShift",
+    "url": "https://github.com/devhb1/on-shift"
+  },
+  "documentationUrl": "https://github.com/devhb1/on-shift#readme",
+  "erc8004": {
+    "identity": "data:application/json,{\"ens\":\"*.ops.onshift.eth\",\"check\":\"getState+till.status\"}"
+  }
 }
