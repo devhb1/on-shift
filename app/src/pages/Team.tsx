@@ -1,196 +1,125 @@
-import { useEffect, useState } from "react";
-import { formatEther, isAddress, type Address } from "viem";
-import { Bot, Building2, Smartphone, UserPlus, UserRound, Users, Wallet, Layers } from "lucide-react";
-import { Button, Card, Field, Pill } from "../components/ui";
-import { RoleGate } from "../components/RoleGate";
+import { useState } from "react";
+import { isAddress, type Address } from "viem";
+import { UserPlus, UserRound } from "lucide-react";
+import { Button, Field, Group, KV, Row, Sheet, Switch } from "../components/ui";
+import { Gate } from "../components/Gate";
 import { useOnShift } from "../lib/onshift";
 import { useSession } from "../lib/session";
 import { send } from "../lib/tx";
-import { publicClient } from "../lib/clients";
 import { ACTION_CHECK_IN, ACTION_REFUND, deployment } from "../lib/config";
 import { humanDuration, sameAddress, short, usdc } from "../lib/format";
-import { mockUSDCAbi, passIssuerAbi } from "../generated/abis";
-
-const ICON = { org: Building2, lead: UserRound, agent: Bot, staff: Smartphone };
+import { passIssuerAbi } from "../generated/abis";
+import { roleLook } from "./shared";
 
 export function Team() {
   const { snapshot } = useOnShift();
-  const { active, identities, run, busy } = useSession();
+  const { operator, operatorRole, run, busy } = useSession();
   const s = snapshot!;
   const d = deployment!;
-  const [leadAddress, setLeadAddress] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [address, setAddress] = useState("");
   const [budget, setBudget] = useState("10");
-  const [balances, setBalances] = useState<Record<string, { eth: bigint; usdc: bigint }>>({});
+  const isOrg = operatorRole === "org";
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(
-      identities.map(async (i) => {
-        const [eth, u] = await Promise.all([
-          publicClient.getBalance({ address: i.address }),
-          publicClient.readContract({ address: d.usdc, abi: mockUSDCAbi, functionName: "balanceOf", args: [i.address] }),
-        ]);
-        return [i.address, { eth, usdc: u }] as const;
-      }),
-    ).then((list) => !cancelled && setBalances(Object.fromEntries(list)));
-    return () => {
-      cancelled = true;
-    };
-  }, [identities, s.blockTs, d.usdc]);
-
-  const name = (a: Address) => identities.find((i) => sameAddress(i.address, a))?.label ?? short(a);
-
-  const saveLead = (address: Address, dailyBudget: number, activeFlag: boolean) =>
-    run(
-      `lead-${address}`,
-      () => send(active.privateKey, { address: d.passIssuer, abi: passIssuerAbi, functionName: "setLead", args: [address, dailyBudget, activeFlag] }),
-      activeFlag ? "Shift lead saved" : "Shift lead disabled",
-    );
+  const saveLead = (lead: Address, dailyBudget: number, active: boolean) =>
+    operator
+      ? run(
+          `lead-${lead}`,
+          () => send(operator.signer, { address: d.passIssuer, abi: passIssuerAbi, functionName: "setLead", args: [lead, dailyBudget, active] }),
+          active ? "Lead saved" : "Lead turned off",
+        )
+      : Promise.resolve(false);
 
   return (
-    <>
-      <div className="grid grid-2">
-        <Card title="Shift leads" icon={Users}>
-          <div className="table-wrap">
-            <table style={{ minWidth: 420 }}>
-              <thead>
-                <tr>
-                  <th>Lead</th>
-                  <th>Today</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {s.leads.map((l) => (
-                  <tr key={l.address}>
-                    <td>
-                      <div className="cell-name">{name(l.address)}</div>
-                      <div className="cell-sub mono">{short(l.address)}</div>
-                    </td>
-                    <td>{l.remaining} of {l.dailyBudget} left</td>
-                    <td>{l.active ? <Pill tone="green">Active</Pill> : <Pill tone="grey">Disabled</Pill>}</td>
-                    <td style={{ textAlign: "right" }}>
-                      {active.kind === "org" && (
-                        <button className="btn btn-sm" disabled={busy === `lead-${l.address}`} onClick={() => saveLead(l.address, l.dailyBudget, !l.active)}>
-                          {l.active ? "Disable" : "Enable"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="small muted">
-            Each lead has a daily issuance budget, so a stolen lead key can do at most budget × cap damage.
-          </p>
-        </Card>
-
-        <Card title="Add or update a lead" icon={UserPlus}>
-          <RoleGate kinds={["org"]} what="Managing shift leads">
-            <div className="stack">
-              <Field label="Lead wallet address">
-                <input className="input mono" placeholder="0x…" value={leadAddress} onChange={(e) => setLeadAddress(e.target.value.trim())} />
-              </Field>
-              <Field label="Passes per day">
-                <input className="input" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, ""))} />
-              </Field>
-              <Button
-                variant="primary"
-                icon={UserPlus}
-                disabled={!isAddress(leadAddress) || !Number(budget)}
-                loading={busy === `lead-${leadAddress}`}
-                onClick={() => saveLead(leadAddress as Address, Number(budget), true)}
-              >
-                Save lead
-              </Button>
-            </div>
-          </RoleGate>
-        </Card>
+    <div className="page page-narrow">
+      <div className="page-head">
+        <div>
+          <h1 className="large-title">Team & Roles</h1>
+          <p className="page-sub">Who can issue passes, and what each kind of pass may do.</p>
+        </div>
+        {isOrg && (
+          <Button variant="primary" icon={UserPlus} onClick={() => setAdding(true)}>
+            Add Lead
+          </Button>
+        )}
       </div>
 
-      <Card title="Role presets" icon={Layers}>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Role</th>
-                <th>Max cap</th>
-                <th>Max shift</th>
-                <th>Can do</th>
-              </tr>
-            </thead>
-            <tbody>
-              {s.presets.map((p) => (
-                <tr key={p.id}>
-                  <td className="cell-name">{p.agent ? <Bot size={14} /> : null} {p.name}</td>
-                  <td>{p.maxCap > 0n ? usdc(p.maxCap) : "-"}</td>
-                  <td>{humanDuration(p.maxDuration)}</td>
-                  <td>
-                    <div className="row row-wrap">
-                      {(p.actions & ACTION_REFUND) !== 0 && <Pill tone="blue">Refund</Pill>}
-                      {(p.actions & ACTION_CHECK_IN) !== 0 && <Pill tone="blue">Check in</Pill>}
-                      <Pill tone="grey">Status</Pill>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <div className="stack">
+        {!isOrg && <Gate need={["org"]} what="Only the org can add or remove shift leads." />}
 
-      <Card title="Wallets in this demo" icon={Wallet}>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Identity</th>
-                <th>Address</th>
-                <th>ETH</th>
-                <th>USDC</th>
-              </tr>
-            </thead>
-            <tbody>
-              {identities.map((i) => {
-                const Icon = ICON[i.kind];
-                const b = balances[i.address];
-                return (
-                  <tr key={i.id}>
-                    <td>
-                      <div className="row">
-                        <div className="avatar"><Icon size={15} /></div>
-                        <div>
-                          <div className="cell-name">{i.label}</div>
-                          <div className="cell-sub">{i.subtitle}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="mono">{short(i.address)}</td>
-                    <td>{b ? Number(formatEther(b.eth)).toFixed(3) : "…"}</td>
-                    <td>{b ? usdc(b.usdc) : "…"}</td>
-                  </tr>
-                );
-              })}
-              <tr>
-                <td>
-                  <div className="row">
-                    <div className="avatar"><Wallet size={15} /></div>
-                    <div>
-                      <div className="cell-name">ShiftGate float</div>
-                      <div className="cell-sub">Maximum blast radius</div>
-                    </div>
-                  </div>
-                </td>
-                <td className="mono">{short(d.shiftGate)}</td>
-                <td>-</td>
-                <td>{usdc(s.gateFloat)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </>
+        <Group title="Shift Leads" footer="Each lead has a daily issuing budget, so a stolen lead key can do at most budget × limit damage — and the org can turn it off here.">
+          {s.leads.map((l) => (
+            <Row
+              key={l.address}
+              icon={UserRound}
+              tint={l.active ? "blue" : "soft"}
+              title={sameAddress(l.address, d.org) ? "Org admin" : `Lead ${short(l.address)}`}
+              subtitle={l.active ? `${l.remaining} of ${l.dailyBudget} passes left today` : "Turned off"}
+              trailing={<Switch on={l.active} disabled={!isOrg || busy === `lead-${l.address}`} onChange={(v) => saveLead(l.address, l.dailyBudget, v)} label={`Lead ${l.address} active`} />}
+            />
+          ))}
+        </Group>
+
+        <Group title="Roles" footer="Roles are set by the org. The limit and allowed actions are written into each pass's ENS record and enforced by the payment gate.">
+          {s.presets.map((p) => {
+            const look = roleLook(p);
+            const can = [p.actions & ACTION_REFUND ? "Refunds" : "", p.actions & ACTION_CHECK_IN ? "Check-in" : "", "Status"].filter(Boolean).join(", ");
+            return (
+              <Row
+                key={p.id}
+                icon={look.icon}
+                tint={look.tint}
+                title={p.name}
+                subtitle={`${can} · up to ${humanDuration(p.maxDuration)}`}
+                trailing={p.maxCap > 0n ? usdc(p.maxCap) : "No spending"}
+              />
+            );
+          })}
+        </Group>
+
+        <Group title="Policy" footer="These limits are constants in the PassIssuer contract.">
+          <KV
+            rows={[
+              ["Longest pass", "12 hours"],
+              ["Shortest pass", "30 seconds"],
+              ["Renewals", "Never — a new shift is a new pass"],
+              ["Gas allowance", "At most 0.05 ETH per pass"],
+              ["Gate float", `${usdc(s.gateFloat)} — the most passes can ever pay out`],
+            ]}
+          />
+        </Group>
+      </div>
+
+      {adding && (
+        <Sheet onClose={() => setAdding(false)}>
+          <div className="sheet-icon" style={{ background: "var(--blue-tint)", color: "var(--blue)" }}>
+            <UserPlus size={28} />
+          </div>
+          <div className="sheet-title">Add a Shift Lead</div>
+          <p className="secondary small" style={{ margin: "6px 0 18px" }}>
+            Leads can issue and revoke passes within their daily budget.
+          </p>
+          <div className="stack-sm">
+            <Field label="Wallet address">
+              <input className="input mono" placeholder="0x…" value={address} onChange={(e) => setAddress(e.target.value.trim())} autoFocus />
+            </Field>
+            <Field label="Passes per day">
+              <input className="input" inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, ""))} />
+            </Field>
+          </div>
+          <div className="row" style={{ justifyContent: "flex-end", marginTop: 22 }}>
+            <Button onClick={() => setAdding(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              disabled={!isAddress(address) || !Number(budget)}
+              loading={busy === `lead-${address}`}
+              onClick={async () => (await saveLead(address as Address, Number(budget), true)) && setAdding(false)}
+            >
+              Add Lead
+            </Button>
+          </div>
+        </Sheet>
+      )}
+    </div>
   );
 }

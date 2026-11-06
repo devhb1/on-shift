@@ -1,5 +1,6 @@
-import type { Abi, Address, Hex, TransactionReceipt } from "viem";
-import { publicClient, walletFor } from "./clients";
+import type { Abi, Address, TransactionReceipt } from "viem";
+import { injectedWallet, publicClient, walletFor } from "./clients";
+import type { Signer } from "./identities";
 import {
   incidentSwitchAbi,
   mockUSDCAbi,
@@ -28,28 +29,28 @@ export type Call = {
 };
 
 /** Simulate first (so designed reverts surface with their real error name), then send and wait. */
-export async function send(privateKey: Hex, call: Call): Promise<TransactionReceipt> {
-  const wallet = walletFor(privateKey);
+export async function send(signer: Signer, call: Call): Promise<TransactionReceipt> {
   const abi = [...call.abi, ...ALL_ERRORS] as Abi;
-  const { request } = await publicClient.simulateContract({
-    account: wallet.account,
-    address: call.address,
-    abi,
-    functionName: call.functionName,
-    args: call.args ?? [],
-    value: call.value,
-  });
-  const hash = await wallet.writeContract(request);
+  const base = { address: call.address, abi, functionName: call.functionName, args: call.args ?? [], value: call.value };
+  let hash: `0x${string}`;
+  if (signer.kind === "key") {
+    const wallet = walletFor(signer.privateKey);
+    const { request } = await publicClient.simulateContract({ ...base, account: wallet.account });
+    hash = await wallet.writeContract(request);
+  } else {
+    const { wallet, address } = await injectedWallet();
+    await publicClient.simulateContract({ ...base, account: address });
+    hash = await wallet.writeContract({ ...base, account: address, chain: wallet.chain });
+  }
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error("Transaction reverted on chain");
   return receipt;
 }
 
-/** Simulate only: used for the "try something forbidden" buttons, which need no gas. */
-export async function simulate(privateKey: Hex, call: Call): Promise<void> {
-  const wallet = walletFor(privateKey);
+/** Simulate only: used for "try something forbidden", which needs no gas and changes nothing. */
+export async function simulate(signer: Signer, call: Call): Promise<void> {
   await publicClient.simulateContract({
-    account: wallet.account,
+    account: signer.address,
     address: call.address,
     abi: [...call.abi, ...ALL_ERRORS] as Abi,
     functionName: call.functionName,

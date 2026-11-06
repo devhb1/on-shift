@@ -28,14 +28,15 @@ const MESSAGES: Record<string, { title: string; detail: string }> = {
   GasDripTooHigh: { title: "Gas allowance too high", detail: "At most 0.05 ETH can be sent with a pass." },
   NamespaceFrozen: { title: "Namespace frozen", detail: "Break-glass is active. Restore the namespace before issuing." },
   UnknownPass: { title: "Unknown pass", detail: "No pass with that name was issued here." },
-  NameAlreadyRegistered: { title: "Name in use", detail: "That pass name is live right now. Pick another name." },
-  NameNotRegistered: { title: "Already ended", detail: "This pass is no longer registered." },
+  LabelAlreadyRegistered: { title: "Name in use", detail: "That pass name is live right now. Pick another name." },
+  LabelExpired: { title: "Already ended", detail: "This pass is no longer registered." },
   TransferDisallowed: {
     title: "Transfer blocked by ENSv2",
     detail: "The pass was registered with roleBitmap 0: no ROLE_CAN_TRANSFER_ADMIN, so it can never change hands.",
   },
-  NotTokenOwner: { title: "Not the owner", detail: "This wallet does not own that pass." },
-  Unauthorized: {
+  ERC1155MissingApprovalForAll: { title: "Not the owner", detail: "This wallet does not own that pass." },
+  EACCannotGrantRoles: { title: "Not allowed", detail: "This wallet cannot grant that permission." },
+  EACUnauthorizedAccountRoles: {
     title: "Blocked by ENSv2 permissions",
     detail: "This wallet holds no role for that record. Staff can only write their own shift.status.",
   },
@@ -53,11 +54,14 @@ export function explain(error: unknown): Explained {
       if (name) return { name, title: name };
       return { title: "Transaction reverted", detail: revert.reason ?? revert.shortMessage };
     }
+    if (/user rejected|denied transaction|rejected the request/i.test(error.message)) {
+      return { title: "Cancelled", detail: "You declined the request in your wallet." };
+    }
     if (/insufficient funds/i.test(error.message)) {
-      return { title: "No gas", detail: "This wallet has no ETH. Issue it a pass with a gas allowance first." };
+      return { title: "No gas", detail: "This wallet has no ETH for gas. Issue passes with a gas allowance, or fund the wallet." };
     }
     if (/fetch|ECONNREFUSED|HTTP request failed/i.test(error.message)) {
-      return { title: "Chain unreachable", detail: "Start the local chain with `npm run dev`." };
+      return { title: "Chain unreachable", detail: "Check your connection, or start the local chain with `npm run dev`." };
     }
     return { title: error.shortMessage };
   }

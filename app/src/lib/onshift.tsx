@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { encodeAbiParameters, keccak256, toBytes, type Address } from "viem";
+import { encodeAbiParameters, keccak256, namehash, toBytes, type Address } from "viem";
 import { publicClient } from "./clients";
-import { deployment } from "./config";
+import { deployment, POLL_MS } from "./config";
 import { sameAddress, usdc } from "./format";
 import { incidentSwitchAbi, passIssuerAbi, permissionedRegistryAbi, shiftGateAbi, mockUSDCAbi } from "../generated/abis";
 
@@ -39,6 +39,8 @@ export type ActivityItem = {
   key: string;
   ts: number;
   blockNumber: bigint;
+  txHash: string;
+  label?: string;
   kind: "issued" | "revoked" | "refund" | "checkin" | "incident" | "restored" | "lead";
   title: string;
   detail: string;
@@ -70,6 +72,9 @@ type Ctx = {
 const OnShiftContext = createContext<Ctx>({ chainOffset: 0, refresh: async () => {} });
 
 export const labelId = (label: string) => BigInt(keccak256(toBytes(label)));
+
+/** ENS node of a pass name, e.g. shift-0412.ops.onshift.eth. */
+export const passNode = (label: string) => namehash(`${label}.ops.${deployment!.orgName}`);
 
 type RawPass = {
   label: string;
@@ -177,7 +182,11 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
   const leads: Lead[] = await Promise.all(
     [...leadMap.values()].map(async (l) => ({
       ...l,
-      remaining: Number(await publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "remainingBudget", args: [l.address] })),
+      remaining: Math.max(
+        0,
+        l.dailyBudget -
+          Number(await publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "issuedOnDay", args: [l.address, BigInt(Math.floor(blockTs / 86400))] })),
+      ),
     })),
   );
 
@@ -190,7 +199,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
   const presetName = (id: number) => presets[id]?.name ?? "Pass";
   const activity: ActivityItem[] = [];
   for (const log of all) {
-    const base = { key: `${log.transactionHash}-${log.logIndex}`, ts: blockTimes.get(log.blockNumber) ?? 0, blockNumber: log.blockNumber };
+    const base = { key: `${log.transactionHash}-${log.logIndex}`, ts: blockTimes.get(log.blockNumber) ?? 0, blockNumber: log.blockNumber, txHash: log.transactionHash, label: "label" in log.args ? (log.args.label as string) : undefined };
     switch (log.eventName) {
       case "PassIssued":
         activity.push({ ...base, kind: "issued", title: `${presetName(log.args.presetId!)} pass issued`, detail: `${log.args.label}.ops.${d.orgName}` });
@@ -211,7 +220,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
         activity.push({ ...base, kind: "restored", title: "Namespace restored (fresh registry)", detail: `Epoch ${log.args.epoch}` });
         break;
       case "LeadUpdated":
-        activity.push({ ...base, kind: "lead", title: log.args.active ? "Shift lead enabled" : "Shift lead disabled", detail: `Daily budget ${log.args.dailyBudget}` });
+        activity.push({ ...base, kind: "lead", title: log.args.active ? "Shift lead added" : "Shift lead removed", detail: `${log.args.dailyBudget} passes per day` });
         break;
     }
   }
@@ -262,7 +271,7 @@ export function OnShiftProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 2000);
+    const t = setInterval(refresh, POLL_MS);
     return () => clearInterval(t);
   }, [refresh]);
 

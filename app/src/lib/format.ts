@@ -54,3 +54,20 @@ export function levenshtein(a: string, b: string) {
 export function randomLabel(prefix = "shift") {
   return `${prefix}-${String(Math.floor(1000 + Math.random() * 9000))}`;
 }
+
+export function clock(ts: number) {
+  return new Date(ts * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+export function dayLabel(ts: number, now: number) {
+  const d = new Date(ts * 1000);
+  const n = new Date(now * 1000);
+  const days = Math.round((new Date(n.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86400000);
+  if (days === 0) return "Today";
+  if (days === 1) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+}
+
+export function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? "" : /(s|sh|ch|x)$/.test(word) ? "es" : "s"}`;
+}

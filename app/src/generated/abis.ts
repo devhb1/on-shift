@@ -12,7 +12,7 @@ export const passIssuerAbi = [
       {
         "name": "factory",
         "type": "address",
-        "internalType": "contract ResolverFactory"
+        "internalType": "contract IVerifiableFactory"
       },
       {
         "name": "resolverImpl",
@@ -30,11 +30,6 @@ export const passIssuerAbi = [
         "internalType": "address"
       },
       {
-        "name": "opsNode",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
         "name": "orgName_",
         "type": "string",
         "internalType": "string"
@@ -50,7 +45,7 @@ export const passIssuerAbi = [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract ResolverFactory"
+        "internalType": "contract IVerifiableFactory"
       }
     ],
     "stateMutability": "view"
@@ -260,77 +255,6 @@ export const passIssuerAbi = [
   },
   {
     "type": "function",
-    "name": "getPassByLabel",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "pass",
-        "type": "tuple",
-        "internalType": "struct PassIssuer.Pass",
-        "components": [
-          {
-            "name": "label",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "holder",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "issuer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "resolver",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "registry",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "issuedAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "expiry",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "presetId",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "cap",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      },
-      {
-        "name": "found",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getPreset",
     "inputs": [
       {
@@ -493,25 +417,6 @@ export const passIssuerAbi = [
   },
   {
     "type": "function",
-    "name": "nodeOf",
-    "inputs": [
-      {
-        "name": "label",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "ops",
     "inputs": [],
     "outputs": [
@@ -519,6 +424,19 @@ export const passIssuerAbi = [
         "name": "",
         "type": "address",
         "internalType": "contract IPermissionedRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "opsDnsName",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "stateMutability": "view"
@@ -558,25 +476,6 @@ export const passIssuerAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "remainingBudget",
-    "inputs": [
-      {
-        "name": "lead",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
       }
     ],
     "stateMutability": "view"
@@ -816,6 +715,11 @@ export const passIssuerAbi = [
   {
     "type": "error",
     "name": "InvalidLabel",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidName",
     "inputs": []
   },
   {
@@ -1291,6 +1195,16 @@ export const incidentSwitchAbi = [
         "name": "emptyRegistry",
         "type": "address",
         "internalType": "contract IPermissionedRegistry"
+      },
+      {
+        "name": "factory",
+        "type": "address",
+        "internalType": "contract IVerifiableFactory"
+      },
+      {
+        "name": "registryImpl",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -1304,6 +1218,19 @@ export const incidentSwitchAbi = [
         "name": "",
         "type": "address",
         "internalType": "contract IPermissionedRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "FACTORY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IVerifiableFactory"
       }
     ],
     "stateMutability": "view"
@@ -1356,6 +1283,19 @@ export const incidentSwitchAbi = [
         "name": "",
         "type": "address",
         "internalType": "contract IPermissionedResolver"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "REGISTRY_IMPL",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -1539,14 +1479,21 @@ export const incidentSwitchAbi = [
 export const permissionedRegistryAbi = [
   {
     "type": "constructor",
-    "inputs": [
+    "inputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "ROOT_RESOURCE",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "admin",
-        "type": "address",
-        "internalType": "address"
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1568,6 +1515,19 @@ export const permissionedRegistryAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "childLabel",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -1626,6 +1586,11 @@ export const permissionedRegistryAbi = [
             "name": "tokenId",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "resource",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -1666,8 +1631,43 @@ export const permissionedRegistryAbi = [
         "internalType": "address"
       }
     ],
-    "outputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "hasRoles",
+    "inputs": [
+      {
+        "name": "resource",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1695,6 +1695,24 @@ export const permissionedRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "initialize",
+    "inputs": [
+      {
+        "name": "rootAccount",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "isApprovedForAll",
     "inputs": [
       {
@@ -1713,25 +1731,6 @@ export const permissionedRegistryAbi = [
         "name": "",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "labelOf",
-    "inputs": [
-      {
-        "name": "labelId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -1757,6 +1756,19 @@ export const permissionedRegistryAbi = [
   },
   {
     "type": "function",
+    "name": "parentRegistry",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPermissionedRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "register",
     "inputs": [
       {
@@ -1770,7 +1782,7 @@ export const permissionedRegistryAbi = [
         "internalType": "address"
       },
       {
-        "name": "subregistry",
+        "name": "registry",
         "type": "address",
         "internalType": "contract IPermissionedRegistry"
       },
@@ -1832,7 +1844,13 @@ export const permissionedRegistryAbi = [
         "internalType": "address"
       }
     ],
-    "outputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -1840,29 +1858,10 @@ export const permissionedRegistryAbi = [
     "name": "roles",
     "inputs": [
       {
-        "name": "tokenId",
+        "name": "anyId",
         "type": "uint256",
         "internalType": "uint256"
       },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "rootRoles",
-    "inputs": [
       {
         "name": "account",
         "type": "address",
@@ -1924,6 +1923,24 @@ export const permissionedRegistryAbi = [
         "name": "approved",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setParent",
+    "inputs": [
+      {
+        "name": "parent",
+        "type": "address",
+        "internalType": "contract IPermissionedRegistry"
+      },
+      {
+        "name": "label",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "outputs": [],
@@ -2005,7 +2022,63 @@ export const permissionedRegistryAbi = [
   },
   {
     "type": "event",
-    "name": "NameRegistered",
+    "name": "EACRolesChanged",
+    "inputs": [
+      {
+        "name": "resource",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "oldRoleBitmap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newRoleBitmap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ExpiryUpdated",
+    "inputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newExpiry",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "LabelRegistered",
     "inputs": [
       {
         "name": "tokenId",
@@ -2036,7 +2109,7 @@ export const permissionedRegistryAbi = [
   },
   {
     "type": "event",
-    "name": "NameRenewed",
+    "name": "LabelUnregistered",
     "inputs": [
       {
         "name": "tokenId",
@@ -2045,32 +2118,7 @@ export const permissionedRegistryAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "newExpiry",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
-      },
-      {
-        "name": "by",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "NameUnregistered",
-    "inputs": [
-      {
-        "name": "labelId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "by",
+        "name": "sender",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -2083,7 +2131,7 @@ export const permissionedRegistryAbi = [
     "name": "ResolverUpdated",
     "inputs": [
       {
-        "name": "labelId",
+        "name": "tokenId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -2093,25 +2141,12 @@ export const permissionedRegistryAbi = [
         "type": "address",
         "indexed": false,
         "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "RootRolesChanged",
-    "inputs": [
+      },
       {
-        "name": "account",
+        "name": "sender",
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      },
-      {
-        "name": "roles",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -2121,7 +2156,7 @@ export const permissionedRegistryAbi = [
     "name": "SubregistryUpdated",
     "inputs": [
       {
-        "name": "labelId",
+        "name": "tokenId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -2130,6 +2165,12 @@ export const permissionedRegistryAbi = [
         "name": "subregistry",
         "type": "address",
         "indexed": false,
+        "internalType": "address"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
         "internalType": "address"
       }
     ],
@@ -2174,7 +2215,28 @@ export const permissionedRegistryAbi = [
   },
   {
     "type": "error",
-    "name": "InvalidExpiry",
+    "name": "AlreadyInitialized",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CannotReduceExpiry",
+    "inputs": [
+      {
+        "name": "oldExpiry",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "newExpiry",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "CannotSetPastExpiry",
     "inputs": [
       {
         "name": "expiry",
@@ -2185,7 +2247,70 @@ export const permissionedRegistryAbi = [
   },
   {
     "type": "error",
-    "name": "NameAlreadyRegistered",
+    "name": "EACCannotGrantRoles",
+    "inputs": [
+      {
+        "name": "resource",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "EACUnauthorizedAccountRoles",
+    "inputs": [
+      {
+        "name": "resource",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC1155MissingApprovalForAll",
+    "inputs": [
+      {
+        "name": "operator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidOwner",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LabelAlreadyRegistered",
     "inputs": [
       {
         "name": "label",
@@ -2196,28 +2321,12 @@ export const permissionedRegistryAbi = [
   },
   {
     "type": "error",
-    "name": "NameNotRegistered",
-    "inputs": [
-      {
-        "name": "labelId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotTokenOwner",
+    "name": "LabelExpired",
     "inputs": [
       {
         "name": "tokenId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
       }
     ]
   },
@@ -2236,22 +2345,6 @@ export const permissionedRegistryAbi = [
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "Unauthorized",
-    "inputs": [
-      {
-        "name": "role",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
   }
 ] as const;
 
@@ -2260,6 +2353,19 @@ export const permissionedResolverAbi = [
     "type": "constructor",
     "inputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "ROOT_RESOURCE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -2287,6 +2393,40 @@ export const permissionedResolverAbi = [
   },
   {
     "type": "function",
+    "name": "authorizeTextRoles",
+    "inputs": [
+      {
+        "name": "toName",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "key",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "grant",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "data",
     "inputs": [
       {
@@ -2311,7 +2451,7 @@ export const permissionedResolverAbi = [
   },
   {
     "type": "function",
-    "name": "grantRoles",
+    "name": "grantRootRoles",
     "inputs": [
       {
         "name": "roleBitmap",
@@ -2324,17 +2464,28 @@ export const permissionedResolverAbi = [
         "internalType": "address"
       }
     ],
-    "outputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "grantTextSetter",
+    "name": "hasRoles",
     "inputs": [
       {
-        "name": "key",
-        "type": "string",
-        "internalType": "string"
+        "name": "res",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "account",
@@ -2342,8 +2493,38 @@ export const permissionedResolverAbi = [
         "internalType": "address"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "hasRootRoles",
+    "inputs": [
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -2353,6 +2534,16 @@ export const permissionedResolverAbi = [
         "name": "admin",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "setters",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
       }
     ],
     "outputs": [],
@@ -2360,7 +2551,31 @@ export const permissionedResolverAbi = [
   },
   {
     "type": "function",
-    "name": "revokeRoles",
+    "name": "resource",
+    "inputs": [
+      {
+        "name": "node",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "part",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "revokeRootRoles",
     "inputs": [
       {
         "name": "roleBitmap",
@@ -2373,31 +2588,24 @@ export const permissionedResolverAbi = [
         "internalType": "address"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "revokeTextSetter",
-    "inputs": [
+    "outputs": [
       {
-        "name": "key",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
     "name": "roles",
     "inputs": [
+      {
+        "name": "res",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
       {
         "name": "account",
         "type": "address",
@@ -2507,32 +2715,8 @@ export const permissionedResolverAbi = [
     "stateMutability": "view"
   },
   {
-    "type": "function",
-    "name": "textSetter",
-    "inputs": [
-      {
-        "name": "keyHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
     "type": "event",
-    "name": "AddrChanged",
+    "name": "AddressChanged",
     "inputs": [
       {
         "name": "node",
@@ -2547,7 +2731,7 @@ export const permissionedResolverAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "value",
+        "name": "newAddress",
         "type": "bytes",
         "indexed": false,
         "internalType": "bytes"
@@ -2576,14 +2760,26 @@ export const permissionedResolverAbi = [
         "type": "string",
         "indexed": false,
         "internalType": "string"
+      },
+      {
+        "name": "value",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
       }
     ],
     "anonymous": false
   },
   {
     "type": "event",
-    "name": "RolesChanged",
+    "name": "EACRolesChanged",
     "inputs": [
+      {
+        "name": "resource",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
       {
         "name": "account",
         "type": "address",
@@ -2591,7 +2787,13 @@ export const permissionedResolverAbi = [
         "internalType": "address"
       },
       {
-        "name": "roles",
+        "name": "oldRoleBitmap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newRoleBitmap",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -2631,41 +2833,21 @@ export const permissionedResolverAbi = [
     "anonymous": false
   },
   {
-    "type": "event",
-    "name": "TextSetterChanged",
-    "inputs": [
-      {
-        "name": "key",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      },
-      {
-        "name": "account",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "allowed",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "error",
     "name": "AlreadyInitialized",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "Unauthorized",
+    "name": "EACCannotGrantRoles",
     "inputs": [
       {
-        "name": "role",
+        "name": "resource",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "roleBitmap",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -2675,6 +2857,32 @@ export const permissionedResolverAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "EACUnauthorizedAccountRoles",
+    "inputs": [
+      {
+        "name": "resource",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidName",
+    "inputs": []
   }
 ] as const;
 
