@@ -65,6 +65,9 @@ export type Snapshot = {
   currentOps: Address;
   incident: boolean;
   incidentReason: string;
+  /** False on deployments whose IncidentSwitch predates till aliasing. */
+  tillQuarantined: boolean;
+  hasTillAlias: boolean;
   epoch: number;
   gateFloat: bigint;
   presets: Preset[];
@@ -214,7 +217,7 @@ async function batched<T>(calls: readonly BatchCall[]): Promise<T[]> {
 async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<bigint, number>, events: EventCache): Promise<Snapshot> {
   const d = deployment!;
 
-  const [block, currentOps, incident, incidentReason, epoch, gateFloat, passCount, presetCount] = await Promise.all([
+  const [block, currentOps, incident, incidentReason, epoch, gateFloat, passCount, presetCount, tillQ] = await Promise.all([
     publicClient.getBlock({ blockTag: "latest" }),
     publicClient.readContract({ address: d.parentRegistry, abi: permissionedRegistryAbi, functionName: "getSubregistry", args: ["ops"] }),
     publicClient.readContract({ address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "incident" }),
@@ -223,6 +226,10 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     publicClient.readContract({ address: d.usdc, abi: mockUSDCAbi, functionName: "balanceOf", args: [d.shiftGate] }),
     publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "passCount" }),
     publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "presetCount" }),
+    publicClient
+      .readContract({ address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "tillQuarantined" })
+      .then((v) => ({ ok: true as const, v: Boolean(v) }))
+      .catch(() => ({ ok: false as const, v: false })),
   ]);
   const blockTs = Number(block.timestamp);
   const tip = block.number ?? 0n;
@@ -371,6 +378,12 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
       case "BreakGlass":
         activity.push({ ...base, kind: "incident", title: "Break-glass: all passes stopped", detail: log.args.reason || "No reason given" });
         break;
+      case "TillQuarantined":
+        activity.push({ ...base, kind: "incident", title: "Till aliased to quarantine", detail: "New pays revert. Refunds still go to the original payer." });
+        break;
+      case "TillPromoted":
+        activity.push({ ...base, kind: "restored", title: "Till promoted back to live", detail: "Auditor attested the gate codehash." });
+        break;
       case "Restored":
         activity.push({ ...base, kind: "restored", title: "Namespace restored (fresh registry)", detail: `Epoch ${log.args.epoch}` });
         break;
@@ -407,6 +420,8 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     currentOps: currentOps as Address,
     incident,
     incidentReason,
+    tillQuarantined: tillQ.v,
+    hasTillAlias: tillQ.ok,
     epoch: Number(epoch),
     gateFloat,
     presets,

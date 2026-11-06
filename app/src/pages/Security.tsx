@@ -38,7 +38,34 @@ export function Security() {
       "restore",
       () => send(operator.signer, { address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "restore" }),
       "Namespace restored",
-      "A fresh registry now serves ops. Old passes stay dead.",
+      "A fresh registry now serves ops. Old passes stay dead. The till stays quarantined until you promote it.",
+    );
+
+  const quarantine = () =>
+    operator &&
+    run(
+      "quarantine",
+      () => send(operator.signer, { address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "quarantineTill" }),
+      "Till quarantined",
+      "till." + d.orgName + " now aliases to quarantine. New pays revert; refunds still go to the payer.",
+    );
+
+  const approvePromote = () =>
+    operator &&
+    run(
+      "approve",
+      () => send(operator.signer, { address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "approvePromote" }),
+      "Codehash attested",
+      "The auditor signed the live gate. Org can promote next.",
+    );
+
+  const promote = () =>
+    operator &&
+    run(
+      "promote",
+      () => send(operator.signer, { address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "promote" }),
+      "Till is live",
+      "Pays work again. The name never changed.",
     );
 
   return (
@@ -61,7 +88,22 @@ export function Security() {
                   ? `Every pass is stopped. Reason: ${s.incidentReason || "not given"}.`
                   : `${plural(live, "pass")} on shift. If keys leak or impostors appear, you can stop all of them in one transaction.`}
               </p>
-              <div style={{ marginTop: 16 }}>
+              <div className="row" style={{ marginTop: 16, flexWrap: "wrap" }}>
+                {s.hasTillAlias && !s.tillQuarantined && (
+                  <Button variant="destructive" icon={ArrowLeftRight} disabled={!isOrg} loading={busy === "quarantine"} onClick={quarantine}>
+                    Quarantine till
+                  </Button>
+                )}
+                {s.hasTillAlias && s.tillQuarantined && (
+                  <>
+                    <Button icon={KeyRound} disabled={!isOrg} loading={busy === "approve"} onClick={approvePromote}>
+                      Attest gate codehash
+                    </Button>
+                    <Button variant="primary" icon={RotateCcw} disabled={!isOrg} loading={busy === "promote"} onClick={promote}>
+                      Promote till
+                    </Button>
+                  </>
+                )}
                 {!s.incident ? (
                   <Button variant="destructive" icon={AlertOctagon} disabled={!isOrg} loading={busy === "break"} onClick={() => setSheet(true)}>
                     Stop All Passes…
@@ -77,9 +119,20 @@ export function Security() {
         </Group>
         {!isOrg && <Gate need={["org"]} what="Only the organisation wallet can stop or restore the namespace." />}
 
+        {s.hasTillAlias && (
+          <Group
+            title="Till alias"
+            footer="This is not a pause() on the gate. Clients resolve till.<org> through ENS. Watchtower can only flip that name onto the pre-registered quarantine name, never onto an attacker contract."
+          >
+            <Row icon={ArrowLeftRight} tint={s.tillQuarantined ? "red" : "green"} title={`till.${d.orgName}`} subtitle={s.tillQuarantined ? "Aliased to quarantine.<org> — new pays revert" : "Live. ShiftGate.pay reads till.status from this name"} />
+            <Row icon={Lock} tint="indigo" title="Refunds still hit the payer" subtitle="Already-paid orders refund as before. The cashier still cannot pick a destination." />
+            <Row icon={KeyRound} tint="orange" title="Promote is dual-key" subtitle="Org plus auditor attestation of the frozen gate extcodehash" />
+          </Group>
+        )}
+
         <Group
           title="How Stop All Passes works"
-          footer={`Restoring never points back at the old registry — that would bring every old pass back. It deploys a new one, so passes from before the incident stay dead.${s.epoch ? ` Restored ${plural(s.epoch, "time")} so far.` : ""}`}
+          footer={`Restoring never points back at the old registry — that would bring every old pass back. It deploys a new one, so passes from before the incident stay dead. The till stays quarantined until promote.${s.epoch ? ` Restored ${plural(s.epoch, "time")} so far.` : ""}`}
         >
           <Row icon={ArrowLeftRight} tint="red" title={`Re-points ops.${d.orgName}`} subtitle="To an empty registry, in one transaction" />
           <Row icon={Layers} tint="orange" title="Every pass fails at once" subtitle="The payment gate reads the live pointer on every call" />

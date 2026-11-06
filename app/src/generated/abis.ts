@@ -764,12 +764,22 @@ export const shiftGateAbi = [
         "internalType": "contract IPermissionedRegistry"
       },
       {
+        "name": "tillResolver",
+        "type": "address",
+        "internalType": "contract IPermissionedResolver"
+      },
+      {
         "name": "usdc",
         "type": "address",
         "internalType": "contract IERC20"
       },
       {
         "name": "opsNode",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "tillNode",
         "type": "bytes32",
         "internalType": "bytes32"
       },
@@ -816,6 +826,32 @@ export const shiftGateAbi = [
         "name": "",
         "type": "address",
         "internalType": "contract IPermissionedRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TILL_NODE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "TILL_RESOLVER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPermissionedResolver"
       }
     ],
     "stateMutability": "view"
@@ -1084,6 +1120,19 @@ export const shiftGateAbi = [
   },
   {
     "type": "function",
+    "name": "tillLive",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "withdrawFloat",
     "inputs": [
       {
@@ -1265,6 +1314,11 @@ export const shiftGateAbi = [
   },
   {
     "type": "error",
+    "name": "TillNotLive",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "TransferFailed",
     "inputs": []
   },
@@ -1295,7 +1349,17 @@ export const incidentSwitchAbi = [
         "internalType": "bytes32"
       },
       {
+        "name": "tillNode",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
         "name": "org",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "gate",
         "type": "address",
         "internalType": "address"
       },
@@ -1313,6 +1377,16 @@ export const incidentSwitchAbi = [
         "name": "registryImpl",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "tillDns_",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "quarantineDns_",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "stateMutability": "nonpayable"
@@ -1339,6 +1413,32 @@ export const incidentSwitchAbi = [
         "name": "",
         "type": "address",
         "internalType": "contract IVerifiableFactory"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "GATE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "LIVE_CODEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -1410,6 +1510,52 @@ export const incidentSwitchAbi = [
   },
   {
     "type": "function",
+    "name": "TILL_NODE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "approvePromote",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "auditor",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "auditorApproved",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "breakGlass",
     "inputs": [
       {
@@ -1475,6 +1621,33 @@ export const incidentSwitchAbi = [
   },
   {
     "type": "function",
+    "name": "promote",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "quarantineDns",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "quarantineTill",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "reason",
     "inputs": [],
     "outputs": [
@@ -1501,6 +1674,19 @@ export const incidentSwitchAbi = [
   },
   {
     "type": "function",
+    "name": "setAuditor",
+    "inputs": [
+      {
+        "name": "who",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPassIssuer",
     "inputs": [
       {
@@ -1511,6 +1697,71 @@ export const incidentSwitchAbi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setWatchtower",
+    "inputs": [
+      {
+        "name": "who",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "tillDns",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tillQuarantined",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "watchtower",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "AuditorSet",
+    "inputs": [
+      {
+        "name": "auditor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -1533,6 +1784,25 @@ export const incidentSwitchAbi = [
         "type": "uint32",
         "indexed": false,
         "internalType": "uint32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PromoteApproved",
+    "inputs": [
+      {
+        "name": "auditor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "codehash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -1563,13 +1833,67 @@ export const incidentSwitchAbi = [
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "TillPromoted",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TillQuarantined",
+    "inputs": [
+      {
+        "name": "by",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "WatchtowerSet",
+    "inputs": [
+      {
+        "name": "watchtower",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "AlreadyInIncident",
     "inputs": []
   },
   {
     "type": "error",
+    "name": "AlreadyQuarantined",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AuditorNotApproved",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "IssuerAlreadySet",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotAuditor",
     "inputs": []
   },
   {
@@ -1580,6 +1904,21 @@ export const incidentSwitchAbi = [
   {
     "type": "error",
     "name": "NotOrg",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotQuarantined",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotWatchtower",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WrongCodehash",
     "inputs": []
   }
 ] as const;
@@ -2796,6 +3135,54 @@ export const permissionedResolverAbi = [
   },
   {
     "type": "function",
+    "name": "getAlias",
+    "inputs": [
+      {
+        "name": "name",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "grantRoles",
+    "inputs": [
+      {
+        "name": "res",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "roleBitmap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "grantRootRoles",
     "inputs": [
       {
@@ -2991,6 +3378,24 @@ export const permissionedResolverAbi = [
   },
   {
     "type": "function",
+    "name": "setAlias",
+    "inputs": [
+      {
+        "name": "fromName",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "toName",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setData",
     "inputs": [
       {
@@ -3077,6 +3482,37 @@ export const permissionedResolverAbi = [
       },
       {
         "name": "newAddress",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "AliasChanged",
+    "inputs": [
+      {
+        "name": "indexedFromName",
+        "type": "bytes",
+        "indexed": true,
+        "internalType": "bytes"
+      },
+      {
+        "name": "indexedToName",
+        "type": "bytes",
+        "indexed": true,
+        "internalType": "bytes"
+      },
+      {
+        "name": "fromName",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      },
+      {
+        "name": "toName",
         "type": "bytes",
         "indexed": false,
         "internalType": "bytes"

@@ -59,6 +59,7 @@ export function DeploymentPage() {
               [`${d.orgName} registry`, <Addr a={d.parentRegistry} />],
               [`${d.orgName} resolver`, <Addr a={d.parentResolver} />],
               ["ops registry (live)", <Addr a={snapshot?.currentOps ?? d.opsRegistry} />],
+              [`till.${d.orgName}`, snapshot?.hasTillAlias ? (snapshot.tillQuarantined ? "quarantine (aliased)" : "live") : "not on this deploy"],
               ["Break-glass registry", <Addr a={d.emptyRegistry} />],
             ]}
           />

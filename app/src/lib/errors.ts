@@ -50,6 +50,13 @@ const MESSAGES: Record<string, { title: string; detail: string }> = {
   },
   AlreadyInIncident: { title: "Already in incident mode", detail: "Break-glass is already active." },
   NotInIncident: { title: "Nothing to restore", detail: "The namespace is not in incident mode." },
+  TillNotLive: { title: "Till is quarantined", detail: "till.onshift.eth is aliased to quarantine. New payments are refused. Refunds of paid orders still go to the original payer." },
+  NotWatchtower: { title: "Watchtower only", detail: "Only the watchtower or the org can alias the till to quarantine." },
+  NotAuditor: { title: "Auditor only", detail: "Only the auditor can attest the live gate's codehash before a promote." },
+  AlreadyQuarantined: { title: "Till already quarantined", detail: "The till name already points at quarantine." },
+  NotQuarantined: { title: "Till is live", detail: "Nothing to promote." },
+  AuditorNotApproved: { title: "Auditor has not approved", detail: "Promoting the till needs a fresh attestation of the gate codehash." },
+  WrongCodehash: { title: "Gate codehash mismatch", detail: "The live gate is not the implementation the auditor signed off on." },
   InsufficientBalance: { title: "Gate float empty", detail: "The payment gate does not hold enough test USDC for this refund." },
 };
 

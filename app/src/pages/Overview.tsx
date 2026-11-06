@@ -46,6 +46,15 @@ export function Overview() {
             </div>
             <ChevronRight size={16} className="chev" />
           </button>
+        ) : s.tillQuarantined ? (
+          <button className="status-strip alert" style={{ border: 0, textAlign: "left", cursor: "pointer" }} onClick={() => navigate("security")}>
+            <Tile icon={ShieldAlert} tint="red" />
+            <div style={{ flex: 1 }}>
+              <div className="strip-title">Till quarantined — new payments refused</div>
+              <div className="small secondary">till.{d.orgName} is aliased to quarantine. Refunds still go to the original payer. Promote from Security after the auditor attests.</div>
+            </div>
+            <ChevronRight size={16} className="chev" />
+          </button>
         ) : (
           <div className="status-strip">
             <Tile icon={ShieldCheck} tint="green" />

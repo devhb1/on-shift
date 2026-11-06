@@ -337,12 +337,12 @@ function Verdict({ result }: { result: Result }) {
         Checked on {networkLabel} at block {result.block.toString()}
         {result.holder ? ` · holder ${short(result.holder)}` : ""}
       </p>
-      {result.issued && <ProofPanel proof={result.proof} />}
+      {result.issued && <ProofPanel proof={result.proof} live={on} />}
     </div>
   );
 }
 
-function ProofPanel({ proof }: { proof: Proof }) {
+function ProofPanel({ proof, live }: { proof: Proof; live: boolean }) {
   const link = (a: Address) => (
     <a href={explorerAddress(a)} target="_blank" rel="noreferrer" className="mono">
       {short(a)}
@@ -354,14 +354,16 @@ function ProofPanel({ proof }: { proof: Proof }) {
       <p className="small secondary" style={{ margin: "8px 0 12px" }}>
         {UNIVERSAL_RESOLVER ? (
           <>
-            Read through the ENS Universal Resolver ({short(UNIVERSAL_RESOLVER)}), the same entry point wallets and explorers use. {proof.resolves ? "The name resolves." : "The name no longer resolves: its registry entry has no resolver, so there is nothing to fall back to."}
+            Liveness is registry <span className="mono">getState</span>, not “does it resolve?”. Expired names have no resolver on ops, so they cannot inherit ancestor records. Universal Resolver ({short(UNIVERSAL_RESOLVER)}) is what wallets see.
           </>
         ) : (
-          "Read from the registry and the pass resolver."
+          "Liveness is registry getState. ops has no resolver, so an expired pass has nothing to fall back to."
         )}
       </p>
       <KV
         rows={[
+          ["Liveness (getState)", live ? "REGISTERED and not expired" : "not live"],
+          ["Universal Resolver", proof.resolves ? "records present" : "empty — no ancestor wildcard fallback"],
           ["Registry (live ops pointer)", link(proof.registry)],
           ["Registry state", proof.registryStatus],
           ["Token ID", <span className="mono">{proof.tokenId.toString().slice(0, 12)}…</span>],

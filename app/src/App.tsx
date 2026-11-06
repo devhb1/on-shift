@@ -164,7 +164,7 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
                   <n.icon size={17} strokeWidth={2} />
                   {n.label}
                   {n.id === "passes" && live > 0 && <span className="nav-count">{live}</span>}
-                  {n.id === "security" && snapshot?.incident && <span className="nav-alert" aria-label="Incident active" />}
+                  {n.id === "security" && (snapshot?.incident || snapshot?.tillQuarantined) && <span className="nav-alert" aria-label="Incident active" />}
                 </button>
               ))}
             </div>
