@@ -1,4 +1,4 @@
-import { AlertOctagon, Bot, CircleDollarSign, DoorOpen, Headset, Plus, RotateCcw, ScanLine, ShoppingBag, Ticket, UserPlus, XOctagon, type LucideIcon } from "lucide-react";
+import { AlertOctagon, Bot, CircleDollarSign, CreditCard, DoorOpen, Headset, Plus, RotateCcw, ScanLine, ShoppingBag, Ticket, UserPlus, XOctagon, type LucideIcon } from "lucide-react";
 import type { ActivityItem, PassRow, Preset, Snapshot } from "../lib/onshift";
 import type { Tint } from "../components/ui";
 import { LOCAL_OPERATORS, type Device } from "../lib/identities";
@@ -23,6 +23,7 @@ export function roleLook(preset?: Preset): { icon: LucideIcon; tint: Tint } {
 export const ACTIVITY_LOOK: Record<ActivityItem["kind"], { icon: LucideIcon; tint: Tint }> = {
   issued: { icon: Plus, tint: "blue" },
   revoked: { icon: XOctagon, tint: "red" },
+  paid: { icon: CreditCard, tint: "green" },
   refund: { icon: CircleDollarSign, tint: "orange" },
   checkin: { icon: Ticket, tint: "green" },
   incident: { icon: AlertOctagon, tint: "red" },

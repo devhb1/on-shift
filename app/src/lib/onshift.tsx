@@ -3,7 +3,7 @@ import { encodeAbiParameters, keccak256, namehash, toBytes, type Address } from 
 import { publicClient } from "./clients";
 import { deployment, POLL_MS } from "./config";
 import { sameAddress, usdc } from "./format";
-import { incidentSwitchAbi, passIssuerAbi, permissionedRegistryAbi, shiftGateAbi, mockUSDCAbi } from "../generated/abis";
+import { incidentSwitchAbi, passIssuerAbi, permissionedRegistryAbi, playgroundAbi, shiftGateAbi, mockUSDCAbi } from "../generated/abis";
 
 export type Preset = {
   id: number;
@@ -33,6 +33,18 @@ export type PassRow = {
   state: PassState;
   shiftStatus: string;
   isLatestForLabel: boolean;
+  /** The wallet that asked the Playground for this pass, if it came from there. */
+  requester?: Address;
+};
+
+export type Order = {
+  orderId: `0x${string}`;
+  payer: Address;
+  paid: bigint;
+  refunded: bigint;
+  blockNumber: bigint;
+  ts: number;
+  txHash: string;
 };
 
 export type ActivityItem = {
@@ -41,7 +53,7 @@ export type ActivityItem = {
   blockNumber: bigint;
   txHash: string;
   label?: string;
-  kind: "issued" | "revoked" | "refund" | "checkin" | "incident" | "restored" | "lead";
+  kind: "issued" | "revoked" | "paid" | "refund" | "checkin" | "incident" | "restored" | "lead";
   title: string;
   detail: string;
 };
@@ -59,6 +71,8 @@ export type Snapshot = {
   passes: PassRow[];
   activity: ActivityItem[];
   leads: Lead[];
+  /** Orders paid into the gate, newest first, with what has been refunded so far. */
+  orders: Order[];
 };
 
 type Ctx = {
@@ -91,6 +105,7 @@ type RawPass = {
 type IssuerLog = Awaited<ReturnType<typeof pullIssuer>>[number];
 type GateLog = Awaited<ReturnType<typeof pullGate>>[number];
 type SwitchLog = Awaited<ReturnType<typeof pullSwitch>>[number];
+type PlaygroundLog = Awaited<ReturnType<typeof pullPlayground>>[number];
 
 type EventCache = {
   /** Last block included in the cached logs. -1 before the first successful read. */
@@ -98,6 +113,7 @@ type EventCache = {
   issuer: IssuerLog[];
   gate: GateLog[];
   sw: SwitchLog[];
+  pg: PlaygroundLog[];
 };
 
 const pullIssuer = (from: bigint, to: bigint) =>
@@ -106,6 +122,10 @@ const pullGate = (from: bigint, to: bigint) =>
   publicClient.getContractEvents({ address: deployment!.shiftGate, abi: shiftGateAbi, fromBlock: from, toBlock: to });
 const pullSwitch = (from: bigint, to: bigint) =>
   publicClient.getContractEvents({ address: deployment!.incidentSwitch, abi: incidentSwitchAbi, fromBlock: from, toBlock: to });
+const pullPlayground = (from: bigint, to: bigint) =>
+  deployment!.playground
+    ? publicClient.getContractEvents({ address: deployment!.playground, abi: playgroundAbi, fromBlock: from, toBlock: to })
+    : Promise.resolve([]);
 
 function isRangeError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -143,17 +163,22 @@ async function syncLogs(cache: EventCache, toBlock: bigint) {
     cache.issuer = [];
     cache.gate = [];
     cache.sw = [];
+    cache.pg = [];
   }
   const from = cache.tip < startBlock ? startBlock : cache.tip > startBlock + 20n ? cache.tip - 20n : startBlock;
   if (from > toBlock) return;
-  const [issuer, gate, sw] = await Promise.all([
+  // The gate and the Playground were deployed after the issuer: don't page through blocks before them.
+  const after = (block?: number) => (block && BigInt(block) > from ? BigInt(block) : from);
+  const [issuer, gate, sw, pg] = await Promise.all([
     collect(from, toBlock, pullIssuer),
-    collect(from, toBlock, pullGate),
+    collect(after(deployment!.gateStartBlock), toBlock, pullGate),
     collect(from, toBlock, pullSwitch),
+    collect(after(deployment!.gateStartBlock), toBlock, pullPlayground),
   ]);
   cache.issuer = mergeLogs(cache.issuer, issuer);
   cache.gate = mergeLogs(cache.gate, gate);
   cache.sw = mergeLogs(cache.sw, sw);
+  cache.pg = mergeLogs(cache.pg, pg);
   cache.tip = toBlock;
 }
 
@@ -227,6 +252,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     events.issuer = [];
     events.gate = [];
     events.sw = [];
+    events.pg = [];
   }
   const missing = Array.from({ length: Number(passCount) }, (_, i) => i).filter((i) => !passCache.has(i));
   const fetched = await batched<RawPass>(
@@ -238,6 +264,8 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
   const issuerLogs = events.issuer;
   const gateLogs = events.gate;
   const switchLogs = events.sw;
+  const requesterByLabel = new Map<string, Address>();
+  for (const log of events.pg) if (log.eventName === "Tried") requesterByLabel.set(log.args.label!, log.args.requester!);
   const revoked = new Set<number>();
   for (const log of issuerLogs) if (log.eventName === "PassRevoked") revoked.add(Number(log.args.index));
 
@@ -291,6 +319,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
       state,
       shiftStatus,
       isLatestForLabel,
+      requester: sameAddress(p.issuer, d.playground) ? requesterByLabel.get(p.label) : undefined,
     };
   });
 
@@ -330,6 +359,9 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
       case "PassRevoked":
         activity.push({ ...base, kind: "revoked", title: "Pass revoked early", detail: `${log.args.label}.ops.${d.orgName}` });
         break;
+      case "Paid":
+        activity.push({ ...base, kind: "paid", title: `Customer paid ${usdc(log.args.amount!)}`, detail: `Order ${log.args.orderId!.slice(0, 10)}…` });
+        break;
       case "Refunded":
         activity.push({ ...base, kind: "refund", title: `Refund of ${usdc(log.args.amount!)} paid`, detail: `${log.args.label}.ops.${d.orgName}` });
         break;
@@ -347,6 +379,27 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
         break;
     }
   }
+  const orderMap = new Map<string, Order>();
+  for (const log of gateLogs) {
+    if (log.eventName === "Paid") {
+      orderMap.set(log.args.orderId!, {
+        orderId: log.args.orderId!,
+        payer: log.args.payer!,
+        paid: log.args.amount!,
+        refunded: 0n,
+        blockNumber: log.blockNumber,
+        ts: blockTimes.get(log.blockNumber) ?? 0,
+        txHash: log.transactionHash,
+      });
+    }
+  }
+  for (const log of gateLogs) {
+    if (log.eventName !== "Refunded") continue;
+    const o = orderMap.get(log.args.orderId!);
+    if (o) o.refunded += log.args.amount!;
+  }
+  const orders = [...orderMap.values()].sort((a, b) => (a.blockNumber < b.blockNumber ? 1 : -1));
+
   activity.sort((a, b) => (a.blockNumber === b.blockNumber ? 0 : a.blockNumber < b.blockNumber ? 1 : -1));
 
   return {
@@ -360,6 +413,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     passes: passes.reverse(),
     activity,
     leads,
+    orders,
   };
 }
 
@@ -369,7 +423,7 @@ export function OnShiftProvider({ children }: { children: ReactNode }) {
   const [chainOffset, setChainOffset] = useState(0);
   const passCache = useRef(new Map<number, RawPass>());
   const blockTimes = useRef(new Map<bigint, number>());
-  const events = useRef<EventCache>({ tip: -1n, issuer: [], gate: [], sw: [] });
+  const events = useRef<EventCache>({ tip: -1n, issuer: [], gate: [], sw: [], pg: [] });
   const inFlight = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {

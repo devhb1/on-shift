@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { isAddress, keccak256, toHex, type Address, type Hex } from "viem";
+import { isHex, keccak256, toHex, type Hex } from "viem";
 import {
   Bot,
   Check,
@@ -22,7 +22,7 @@ import { send, simulate } from "../lib/tx";
 import { explain } from "../lib/errors";
 import { publicClient } from "../lib/clients";
 import { ACTION_CHECK_IN, ACTION_REFUND, deployment, isLocal } from "../lib/config";
-import { ATTACKER_ADDRESS, CUSTOMER_ADDRESS, type Device } from "../lib/identities";
+import { ATTACKER_ADDRESS, type Device } from "../lib/identities";
 import { clock, sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { permissionedRegistryAbi, permissionedResolverAbi, shiftGateAbi } from "../generated/abis";
 import { ThemeToggle, navigate } from "../App";
@@ -167,21 +167,32 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
 
   const [sheet, setSheet] = useState<"refund" | "checkin" | "status" | null>(null);
   const [amount, setAmount] = useState("10");
-  const [customer, setCustomer] = useState(isLocal ? CUSTOMER_ADDRESS : "");
+  const [orderCode, setOrderCode] = useState("");
   const [ticket, setTicket] = useState("TKT-1042");
   const [status, setStatus] = useState("");
   const [probes, setProbes] = useState<Record<string, Probe>>({});
 
   const node = async () => passNode(pass.label);
+  const openOrders = s.orders.filter((o) => o.paid > o.refunded);
+  const codeOk = isHex(orderCode) && orderCode.length === 66;
+  const order = codeOk ? s.orders.find((o) => o.orderId.toLowerCase() === orderCode.toLowerCase()) : undefined;
+  const amountUnits = (() => {
+    try {
+      return toUsdcUnits(amount);
+    } catch {
+      return 0n;
+    }
+  })();
+  const bigOrder = s.orders.find((o) => o.paid - o.refunded > remaining);
 
   const act = async (key: "refund" | "checkin" | "status") => {
     setSheet(null);
     if (key === "refund")
       await run(
         "refund",
-        () => send(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, customer as Address, toUsdcUnits(amount), randomId()] }),
-        `Refunded ${usdc(toUsdcUnits(amount))}`,
-        "Paid from the payment gate to the customer wallet.",
+        () => send(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, orderCode as Hex, amountUnits] }),
+        `Refunded ${usdc(amountUnits)}`,
+        "Sent back to the wallet that paid the order.",
       );
     if (key === "checkin")
       await run(
@@ -231,9 +242,18 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
     ...(canRefund
       ? [
           {
+            key: "self",
+            label: "Refund money to my own wallet",
+            run: () => simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
+          },
+        ]
+      : []),
+    ...(canRefund && bigOrder
+      ? [
+          {
             key: "over",
             label: `Refund ${usdc(remaining + 1_000_000n)} — over my limit`,
-            run: () => simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, ATTACKER_ADDRESS, remaining + 1_000_000n, randomId()] }),
+            run: () => simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, bigOrder.orderId, remaining + 1_000_000n] }),
           },
         ]
       : []),
@@ -282,7 +302,7 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
             <Button
               onClick={() =>
                 probe("late", "Refund after the shift", () =>
-                  simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, CUSTOMER_ADDRESS, 1_000_000n, randomId()] }),
+                  simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
                 )
               }
             >
@@ -295,8 +315,9 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
 
       <Group title="This pass can">
         <Row icon={Check} tint="green" title="Update its status note" plain />
-        {canRefund && <Row icon={Check} tint="green" title={`Refund customers, up to ${usdc(pass.cap)} in total`} plain />}
+        {canRefund && <Row icon={Check} tint="green" title={`Refund paid orders, up to ${usdc(pass.cap)} in total`} plain />}
         {canCheckIn && <Row icon={Check} tint="green" title="Check in tickets" plain />}
+        <Row icon={Lock} tint="soft" title="Choose who a refund goes to" plain />
         <Row icon={Lock} tint="soft" title="Change where payouts go" plain />
         <Row icon={Lock} tint="soft" title="Transfer, sell or lend the pass" plain />
         <Row icon={Lock} tint="soft" title="Extend the shift or raise the limit" plain />
@@ -334,10 +355,45 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
             <>
               <div className="sheet-title">Refund a Customer</div>
               <p className="secondary small" style={{ margin: "6px 0 18px" }}>
-                {usdc(remaining)} left on this pass. Paid from {d.orgName}'s payment gate, in {isLocal ? "USDC" : "test USDC"}.
+                {usdc(remaining)} left on this pass. The money goes back to the wallet that paid the order, in {isLocal ? "USDC" : "test USDC"}.
               </p>
-              <Field label="Customer wallet" hint={isAddress(customer) ? undefined : "Paste the wallet that should receive the refund."}>
-                <input className="input mono" placeholder="0x…" value={customer} onChange={(e) => setCustomer(e.target.value.trim())} autoFocus />
+              {openOrders.length > 0 && (
+                <div className="stack-sm" style={{ marginBottom: 14 }}>
+                  <div className="small secondary">Recent paid orders</div>
+                  {openOrders.slice(0, 4).map((o) => (
+                    <button
+                      key={o.orderId}
+                      className={`list-row plain ${o.orderId === orderCode ? "selected" : ""}`}
+                      style={{ borderRadius: 10 }}
+                      onClick={() => {
+                        setOrderCode(o.orderId);
+                        const left = o.paid - o.refunded;
+                        if (amountUnits > left) setAmount(String(Number(left) / 1e6));
+                      }}
+                    >
+                      <div className="row-main">
+                        <div className="row-title">{usdc(o.paid - o.refunded)} refundable</div>
+                        <div className="row-sub mono">
+                          {o.orderId.slice(0, 10)}… · paid by {short(o.payer)}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Field
+                label="Order code"
+                hint={
+                  !orderCode
+                    ? "From the customer's receipt. The refund goes to the wallet that paid it."
+                    : !codeOk
+                      ? "An order code is 0x followed by 64 hex characters."
+                      : order
+                        ? `Paid ${usdc(order.paid)} by ${short(order.payer)}. ${usdc(order.paid - order.refunded)} left to refund.`
+                        : "Not in the recent orders. The gate will check it."
+                }
+              >
+                <input className="input mono" placeholder="0x…" value={orderCode} onChange={(e) => setOrderCode(e.target.value.trim())} />
               </Field>
               <Field label="Amount">
                 <div className="affix">
@@ -372,7 +428,7 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
             <Button
               block
               variant="primary"
-              disabled={(sheet === "refund" && (!Number(amount) || !isAddress(customer))) || (sheet === "checkin" && !ticket) || (sheet === "status" && !status)}
+              disabled={(sheet === "refund" && (amountUnits <= 0n || !codeOk)) || (sheet === "checkin" && !ticket) || (sheet === "status" && !status)}
               onClick={() => act(sheet)}
             >
               {sheet === "refund" ? "Refund" : sheet === "checkin" ? "Check In" : "Update"}

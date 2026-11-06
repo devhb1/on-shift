@@ -8,9 +8,9 @@ import { ACTIVITY_LOOK } from "./shared";
 
 type Filter = "all" | "passes" | "payments" | "security";
 const MATCH: Record<Filter, ActivityItem["kind"][]> = {
-  all: ["issued", "revoked", "refund", "checkin", "incident", "restored", "lead"],
+  all: ["issued", "revoked", "paid", "refund", "checkin", "incident", "restored", "lead"],
   passes: ["issued", "revoked", "lead"],
-  payments: ["refund", "checkin"],
+  payments: ["paid", "refund", "checkin"],
   security: ["incident", "restored", "revoked"],
 };
 

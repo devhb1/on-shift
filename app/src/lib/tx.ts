@@ -7,6 +7,7 @@ import {
   passIssuerAbi,
   permissionedRegistryAbi,
   permissionedResolverAbi,
+  playgroundAbi,
   shiftGateAbi,
 } from "../generated/abis";
 
@@ -18,6 +19,7 @@ const ALL_ERRORS = [
   ...permissionedRegistryAbi,
   ...permissionedResolverAbi,
   ...mockUSDCAbi,
+  ...playgroundAbi,
 ].filter((item) => item.type === "error");
 
 export type Call = {

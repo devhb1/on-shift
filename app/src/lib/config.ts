@@ -25,6 +25,11 @@ export type Deployment = {
   passIssuer: Address;
   shiftGate: Address;
   incidentSwitch: Address;
+  /** Public lead with tight limits. Absent on deployments made before it existed. */
+  playground?: Address;
+  /** First block of the current ShiftGate, when it was replaced after the first deployment. */
+  gateStartBlock?: number;
+  legacyShiftGate?: Address;
 };
 
 const all = deployments as Record<string, Deployment>;

@@ -14,6 +14,7 @@ const contracts = [
   "PassIssuer",
   "ShiftGate",
   "IncidentSwitch",
+  "Playground",
   "PermissionedRegistry",
   "PermissionedResolver",
   "MockUSDC",

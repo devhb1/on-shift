@@ -866,7 +866,26 @@ export const shiftGateAbi = [
   },
   {
     "type": "function",
-    "name": "orderDone",
+    "name": "orderNonce",
+    "inputs": [
+      {
+        "name": "payer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "orders",
     "inputs": [
       {
         "name": "orderId",
@@ -876,9 +895,19 @@ export const shiftGateAbi = [
     ],
     "outputs": [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "name": "payer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "paid",
+        "type": "uint128",
+        "internalType": "uint128"
+      },
+      {
+        "name": "refunded",
+        "type": "uint128",
+        "internalType": "uint128"
       }
     ],
     "stateMutability": "view"
@@ -956,6 +985,25 @@ export const shiftGateAbi = [
   },
   {
     "type": "function",
+    "name": "pay",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "orderId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "refund",
     "inputs": [
       {
@@ -964,23 +1012,37 @@ export const shiftGateAbi = [
         "internalType": "string"
       },
       {
-        "name": "customer",
-        "type": "address",
-        "internalType": "address"
+        "name": "orderId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
-      },
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "refundable",
+    "inputs": [
       {
         "name": "orderId",
         "type": "bytes32",
         "internalType": "bytes32"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1084,6 +1146,31 @@ export const shiftGateAbi = [
   },
   {
     "type": "event",
+    "name": "Paid",
+    "inputs": [
+      {
+        "name": "orderId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Refunded",
     "inputs": [
       {
@@ -1126,6 +1213,11 @@ export const shiftGateAbi = [
   },
   {
     "type": "error",
+    "name": "InvalidAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotOrg",
     "inputs": []
   },
@@ -1140,6 +1232,17 @@ export const shiftGateAbi = [
     "inputs": [
       {
         "name": "remaining",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OverRefund",
+    "inputs": [
+      {
+        "name": "refundable",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1163,6 +1266,11 @@ export const shiftGateAbi = [
   {
     "type": "error",
     "name": "TransferFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnknownOrder",
     "inputs": []
   }
 ] as const;
@@ -1472,6 +1580,243 @@ export const incidentSwitchAbi = [
   {
     "type": "error",
     "name": "NotOrg",
+    "inputs": []
+  }
+] as const;
+
+export const playgroundAbi = [
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "issuer",
+        "type": "address",
+        "internalType": "contract PassIssuer"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "ISSUER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract PassIssuer"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_CAP",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_DURATION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_PER_DAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "count",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "requesterOf",
+    "inputs": [
+      {
+        "name": "labelhash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "revoke",
+    "inputs": [
+      {
+        "name": "label",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "triesOnDay",
+    "inputs": [
+      {
+        "name": "requester",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "day",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "tryIt",
+    "inputs": [
+      {
+        "name": "holder",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "presetId",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "duration",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "cap",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "agentContext",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "label",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "event",
+    "name": "Tried",
+    "inputs": [
+      {
+        "name": "label",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "requester",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "holder",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "presetId",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "duration",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "cap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "CapTooHigh",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DurationTooLong",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotRequester",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooManyToday",
     "inputs": []
   }
 ] as const;

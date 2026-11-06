@@ -3,6 +3,7 @@ import {
   Activity,
   BadgeCheck,
   Clock3,
+  CreditCard,
   LayoutGrid,
   ListChecks,
   Moon,
@@ -29,8 +30,9 @@ import { DeploymentPage } from "./pages/DeploymentPage";
 import { DeviceApp } from "./pages/DeviceApp";
 import { Verify } from "./pages/Verify";
 import { Setup } from "./pages/Setup";
+import { PayPage } from "./pages/PayPage";
 
-export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify";
+export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify" | "pay";
 
 const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof Activity }[] }[] = [
   {
@@ -57,7 +59,7 @@ const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof 
   },
 ];
 
-const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify"];
+const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify", "pay"];
 
 function parseHash(): { route: Route; params: URLSearchParams } {
   const [path, query] = window.location.hash.replace(/^#\/?/, "").split("?");
@@ -169,6 +171,9 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
             <button className="nav-item" onClick={() => navigate("device")}>
               <Smartphone size={17} /> Staff App
             </button>
+            <button className="nav-item" onClick={() => navigate("pay")}>
+              <CreditCard size={17} /> Customer Pay
+            </button>
             <button className="nav-item" onClick={() => navigate("verify")}>
               <BadgeCheck size={17} /> Public Check
             </button>
@@ -215,6 +220,14 @@ export function App() {
     return (
       <>
         {notReady ? <Setup error={error} /> : <Verify initialName={params.get("name") ?? ""} />}
+        <Toasts />
+      </>
+    );
+  }
+  if (route === "pay") {
+    return (
+      <>
+        {notReady ? <Setup error={error} /> : !snapshot ? loading : <PayPage />}
         <Toasts />
       </>
     );
