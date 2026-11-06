@@ -16,6 +16,7 @@
     "build:web": "node scripts/prepare-web.mjs && npm --workspace app run build && node scripts/copy-web-dist.mjs",
     "typecheck": "npm --workspace app run typecheck",
     "agent": "node scripts/agent-demo.mjs",
+    "counterparty": "node scripts/counterparty.mjs",
     "test:fork": "cd contracts && set -a && . ./.env && set +a && forge test --match-contract SepoliaForkTest -vv",
     "deploy:sepolia": "cd contracts && set -a && . ./.env && set +a && forge script script/DeploySepolia.s.sol --rpc-url $SEPOLIA_RPC_URL --private-key $SEPOLIA_PRIVATE_KEY --broadcast --slow --skip-simulation && cd .. && node scripts/export-abis.mjs",
     "register:sepolia": "set -a && . contracts/.env && set +a && node scripts/register-ens.mjs",
