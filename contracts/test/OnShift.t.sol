@@ -12,12 +12,32 @@ import {NameHash} from "../src/ensv2-local/NameHash.sol";
 import {PassIssuer} from "../src/PassIssuer.sol";
 import {ShiftGate} from "../src/ShiftGate.sol";
 import {IncidentSwitch} from "../src/IncidentSwitch.sol";
+import {MockUSDC} from "../src/mocks/MockUSDC.sol";
+import {IERC20} from "../src/interfaces/IERC20.sol";
 import {OnShiftTypes} from "../src/OnShiftTypes.sol";
 
-contract OnShiftTest is Test, OnShiftDeployer {
+/// @notice The registry surface the tests poke at directly (ERC1155 + EAC), identical on the local layer
+///         and on the real ENSv2 UserRegistry.
+interface ITestRegistry {
+    function roles(uint256 anyId, address account) external view returns (uint256);
+    function setApprovalForAll(address operator, bool approved) external;
+    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes calldata data)
+        external;
+}
+
+/// @notice One suite, two runners: OnShiftLocalTest (local ENSv2 layer) and SepoliaForkTest
+///         (the real ENSv2 contracts on a Sepolia fork).
+abstract contract OnShiftSuite is Test, OnShiftDeployer {
     using NameHash for bytes32;
 
     System internal s;
+    IPermissionedRegistry internal ops;
+    MockUSDC internal usdc;
+
+    uint256 internal constant ISSUER_ROLES = ResolverRoles.RECORDS | (ResolverRoles.RECORDS << 128);
+
+    /// @dev The ENSv2 contracts to build on.
+    function _infra() internal virtual returns (Infra memory);
 
     address internal org = makeAddr("org-multisig");
     address internal treasury = makeAddr("treasury");
@@ -33,12 +53,15 @@ contract OnShiftTest is Test, OnShiftDeployer {
     uint8 internal constant AI_AGENT = 2;
     uint8 internal constant DOOR = 3;
 
-    function setUp() public {
-        vm.warp(1_800_000_000);
+    function setUp() public virtual {
+        if (block.timestamp < 1_800_000_000) vm.warp(1_800_000_000);
+        Infra memory infra = _infra();
         vm.startPrank(org);
-        s = _deployOnShift(org, treasury);
+        usdc = new MockUSDC();
+        s = _deployOnShift(org, treasury, IERC20(address(usdc)), infra, "onshift.eth");
+        ops = s.ops;
         s.issuer.setLead(lead, 5, true);
-        s.usdc.mint(address(s.gate), 500e6);
+        usdc.mint(address(s.gate), 500e6);
         vm.stopPrank();
         vm.deal(lead, 10 ether);
     }
@@ -53,8 +76,8 @@ contract OnShiftTest is Test, OnShiftDeployer {
         tokenId = s.issuer.issue(label, holder, preset, duration, cap, "");
     }
 
-    function _resolverOf(string memory label) internal view returns (PermissionedResolver) {
-        return PermissionedResolver(s.ops.getResolver(label));
+    function _resolverOf(string memory label) internal view returns (IPermissionedResolver) {
+        return IPermissionedResolver(ops.getResolver(label));
     }
 
     function _node(string memory label) internal view returns (bytes32) {
@@ -66,18 +89,18 @@ contract OnShiftTest is Test, OnShiftDeployer {
     function test_Issue_registersPassWithZeroRolesAndItsOwnResolver() public {
         uint256 tokenId = _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
 
-        IPermissionedRegistry.State memory st = s.ops.getState(NameHash.labelId("shift-0412"));
+        IPermissionedRegistry.State memory st = ops.getState(NameHash.labelId("shift-0412"));
         assertEq(uint8(st.status), uint8(IPermissionedRegistry.Status.REGISTERED));
         assertEq(st.latestOwner, staff);
         assertEq(st.expiry, block.timestamp + 4 hours);
-        assertEq(s.ops.ownerOf(tokenId), staff);
-        assertEq(s.ops.roles(tokenId, staff), 0, "roleBitmap must be 0");
+        assertEq(ops.ownerOf(tokenId), staff);
+        assertEq(ITestRegistry(address(ops)).roles(tokenId, staff), 0, "roleBitmap must be 0");
 
-        PermissionedResolver r = _resolverOf("shift-0412");
+        IPermissionedResolver r = _resolverOf("shift-0412");
         assertTrue(address(r) != address(0));
         assertTrue(address(r) != address(s.parentResolver));
         assertEq(r.addr(_node("shift-0412"), 60), abi.encodePacked(treasury));
-        assertEq(r.text(_node("shift-0412"), "org"), "acme.eth");
+        assertEq(r.text(_node("shift-0412"), "org"), "onshift.eth");
         assertEq(r.text(_node("shift-0412"), "role"), "Cashier");
 
         OnShiftTypes.Scope memory scope =
@@ -133,13 +156,13 @@ contract OnShiftTest is Test, OnShiftDeployer {
         for (uint256 i; i < 5; ++i) {
             _issue(string.concat("p", vm.toString(i)), staff, CASHIER, 1 hours, 1e6);
         }
-        assertEq(s.issuer.remainingBudget(lead), 0);
+        assertEq(s.issuer.issuedOnDay(lead, vm.getBlockTimestamp() / 1 days), 5);
         vm.prank(lead);
         vm.expectRevert(PassIssuer.DailyBudgetExhausted.selector);
         s.issuer.issue("p5", staff, CASHIER, 1 hours, 1e6, "");
 
         vm.warp(block.timestamp + 1 days);
-        assertEq(s.issuer.remainingBudget(lead), 5);
+        assertEq(s.issuer.issuedOnDay(lead, vm.getBlockTimestamp() / 1 days), 0);
         _issue("p5", staff, CASHIER, 1 hours, 1e6);
     }
 
@@ -147,7 +170,7 @@ contract OnShiftTest is Test, OnShiftDeployer {
         _issue("shift-1", staff, CASHIER, 1 hours, 1e6);
         vm.prank(lead);
         vm.expectRevert(
-            abi.encodeWithSelector(PermissionedRegistry.NameAlreadyRegistered.selector, "shift-1")
+            abi.encodeWithSelector(PermissionedRegistry.LabelAlreadyRegistered.selector, "shift-1")
         );
         s.issuer.issue("shift-1", attacker, CASHIER, 1 hours, 1e6, "");
     }
@@ -156,32 +179,20 @@ contract OnShiftTest is Test, OnShiftDeployer {
 
     function test_Staff_canUpdateOnlyShiftStatus() public {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
-        PermissionedResolver r = _resolverOf("shift-0412");
+        IPermissionedResolver r = _resolverOf("shift-0412");
         bytes32 node = _node("shift-0412");
 
         vm.startPrank(staff);
         r.setText(node, "shift.status", "Lane 3");
         assertEq(r.text(node, "shift.status"), "Lane 3");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PermissionedResolver.Unauthorized.selector, ResolverRoles.ROLE_SET_ADDR, staff
-            )
-        );
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
         r.setAddr(node, 60, abi.encodePacked(attacker));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PermissionedResolver.Unauthorized.selector, ResolverRoles.ROLE_SET_TEXT, staff
-            )
-        );
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
         r.setText(node, "role", "Admin");
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PermissionedResolver.Unauthorized.selector, ResolverRoles.ROLE_SET_DATA, staff
-            )
-        );
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
         r.setData(node, "pass.scope", abi.encode(type(uint256).max));
         vm.stopPrank();
     }
@@ -193,35 +204,27 @@ contract OnShiftTest is Test, OnShiftDeployer {
         vm.expectRevert(
             abi.encodeWithSelector(PermissionedRegistry.TransferDisallowed.selector, tokenId, staff)
         );
-        s.ops.safeTransferFrom(staff, attacker, tokenId, 1, "");
+        ITestRegistry(address(ops)).safeTransferFrom(staff, attacker, tokenId, 1, "");
 
         // approved operators inherit the owner's roles -> with roleBitmap 0 there is nothing to inherit
         vm.prank(staff);
-        s.ops.setApprovalForAll(attacker, true);
-        assertEq(s.ops.roles(tokenId, attacker), 0);
+        ITestRegistry(address(ops)).setApprovalForAll(attacker, true);
+        assertEq(ITestRegistry(address(ops)).roles(tokenId, attacker), 0);
         vm.prank(attacker);
         vm.expectRevert(
             abi.encodeWithSelector(PermissionedRegistry.TransferDisallowed.selector, tokenId, staff)
         );
-        s.ops.safeTransferFrom(staff, attacker, tokenId, 1, "");
+        ITestRegistry(address(ops)).safeTransferFrom(staff, attacker, tokenId, 1, "");
     }
 
     function test_Staff_cannotRepointResolverOrSubregistry() public {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         uint256 id = NameHash.labelId("shift-0412");
         vm.startPrank(staff);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PermissionedRegistry.Unauthorized.selector, RegistryRoles.ROLE_SET_RESOLVER, staff
-            )
-        );
-        s.ops.setResolver(id, attacker);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PermissionedRegistry.Unauthorized.selector, RegistryRoles.ROLE_SET_SUBREGISTRY, staff
-            )
-        );
-        s.ops.setSubregistry(id, IPermissionedRegistry(attacker));
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
+        ops.setResolver(id, attacker);
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
+        ops.setSubregistry(id, IPermissionedRegistry(attacker));
         vm.stopPrank();
     }
 
@@ -229,31 +232,46 @@ contract OnShiftTest is Test, OnShiftDeployer {
     function test_PerPassResolver_isolatesPasses() public {
         _issue("shift-a", staff, CASHIER, 4 hours, 50e6);
         _issue("shift-b", staff2, CASHIER, 4 hours, 50e6);
-        PermissionedResolver rB = _resolverOf("shift-b");
+        IPermissionedResolver rB = _resolverOf("shift-b");
 
         vm.prank(staff);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PermissionedResolver.Unauthorized.selector, ResolverRoles.ROLE_SET_TEXT, staff
-            )
-        );
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
         rB.setText(_node("shift-b"), "shift.status", "hijacked");
     }
 
-    /// C1, the counterfactual: this is what WOULD happen if passes shared one resolver.
-    function test_SharedResolver_wouldLetStaffOverwriteEachOther() public {
-        PermissionedResolver shared = PermissionedResolver(
-            s.factory
+    /// C1, the counterfactual. The current ENSv2 resolver CAN scope a grant to one record of one name,
+    /// but grants are keyed by namehash, and a re-issued label has the same namehash. On a shared
+    /// resolver the previous holder's grant would survive into the next holder's pass. Per-pass
+    /// resolvers make that impossible: the new pass gets a fresh instance with no old grants.
+    function test_SharedResolver_perNameGrantSurvivesReissue() public {
+        IPermissionedResolver shared = IPermissionedResolver(
+            s.infra.factory
                 .deployProxy(
-                    address(s.resolverImpl),
-                    "shared",
-                    abi.encodeCall(IPermissionedResolver.initialize, (address(this)))
+                    s.infra.resolverImpl,
+                    uint256(keccak256("shared")),
+                    abi.encodeCall(
+                        IPermissionedResolver.initialize, (address(this), ISSUER_ROLES, new bytes[](0))
+                    )
                 )
         );
-        shared.grantTextSetter("shift.status", staff); // key-scoped, but NOT name-scoped
+        bytes memory name = NameHash.dnsEncode("shift-1.ops.onshift.eth");
+        shared.authorizeTextRoles(name, "shift.status", staff, true);
+
+        // shift ends; the same label is issued to someone else
+        _issue("shift-1", staff, CASHIER, 90 seconds, 1e6);
+        vm.warp(block.timestamp + 2 minutes);
+        _issue("shift-1", staff2, CASHIER, 1 hours, 1e6);
+
+        // shared resolver: the OLD holder can still write the NEW holder's status
         vm.prank(staff);
-        shared.setText(_node("shift-b"), "shift.status", "hijacked");
-        assertEq(shared.text(_node("shift-b"), "shift.status"), "hijacked");
+        shared.setText(_node("shift-1"), "shift.status", "hijacked");
+        assertEq(shared.text(_node("shift-1"), "shift.status"), "hijacked");
+
+        // per-pass resolver (what OnShift does): the old holder has no grant on the new instance
+        IPermissionedResolver fresh = _resolverOf("shift-1");
+        vm.prank(staff);
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
+        fresh.setText(_node("shift-1"), "shift.status", "hijacked");
     }
 
     // ---------------------------------------------------------------- ShiftGate
@@ -262,7 +280,7 @@ contract OnShiftTest is Test, OnShiftDeployer {
         _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
         vm.prank(staff);
         s.gate.refund("shift-0412", customer, 10e6, "order-1");
-        assertEq(s.usdc.balanceOf(customer), 10e6);
+        assertEq(usdc.balanceOf(customer), 10e6);
     }
 
     function test_Gate_overCapReverts() public {
@@ -302,7 +320,7 @@ contract OnShiftTest is Test, OnShiftDeployer {
     /// C2: at expiry nobody sends a transaction, yet every gated action dies.
     function test_Expiry_killsGateWithoutAnyTransaction() public {
         _issue("shift-0412", staff, CASHIER, 90 seconds, 50e6);
-        PermissionedResolver r = _resolverOf("shift-0412");
+        IPermissionedResolver r = _resolverOf("shift-0412");
 
         vm.warp(block.timestamp + 90 seconds);
 
@@ -311,11 +329,11 @@ contract OnShiftTest is Test, OnShiftDeployer {
         s.gate.refund("shift-0412", customer, 1e6, "order-1");
 
         // registry view of an expired pass (C3 / C7)
-        IPermissionedRegistry.State memory st = s.ops.getState(NameHash.labelId("shift-0412"));
+        IPermissionedRegistry.State memory st = ops.getState(NameHash.labelId("shift-0412"));
         assertEq(uint8(st.status), uint8(IPermissionedRegistry.Status.AVAILABLE));
         assertEq(st.latestOwner, staff, "latestOwner ignores expiry");
-        assertEq(s.ops.getResolver("shift-0412"), address(0));
-        assertEq(s.ops.ownerOf(st.tokenId), address(0));
+        assertEq(ops.getResolver("shift-0412"), address(0));
+        assertEq(ops.ownerOf(st.tokenId), address(0));
 
         // the honest part: the staff's resolver role survives expiry, the write still succeeds,
         // but it is INERT because the registry no longer points at this resolver.
@@ -349,12 +367,12 @@ contract OnShiftTest is Test, OnShiftDeployer {
     function test_Renew_issuerHasNoRole_andGateRefusesRevivedPass() public {
         _issue("shift-0412", staff, CASHIER, 90 seconds, 50e6);
         uint256 id = NameHash.labelId("shift-0412");
-        assertFalse(s.ops.hasRootRoles(RegistryRoles.ROLE_RENEW, address(s.issuer)));
+        assertFalse(ops.hasRootRoles(RegistryRoles.ROLE_RENEW, address(s.issuer)));
 
         vm.warp(block.timestamp + 2 minutes);
         vm.prank(org);
-        s.ops.renew(id, uint64(block.timestamp + 1 hours));
-        assertEq(uint8(s.ops.getState(id).status), uint8(IPermissionedRegistry.Status.REGISTERED));
+        ops.renew(id, uint64(block.timestamp + 1 hours));
+        assertEq(uint8(ops.getState(id).status), uint8(IPermissionedRegistry.Status.REGISTERED));
 
         vm.prank(staff);
         vm.expectRevert(ShiftGate.ScopeMismatch.selector);
@@ -370,7 +388,7 @@ contract OnShiftTest is Test, OnShiftDeployer {
         vm.warp(block.timestamp + 91 seconds);
         uint256 t2 = _issue("shift-0412", staff2, CASHIER, 1 hours, 10e6);
         assertTrue(t1 != t2);
-        assertEq(s.ops.ownerOf(t1), address(0));
+        assertEq(ops.ownerOf(t1), address(0));
 
         vm.prank(staff); // the old holder is not the holder any more
         vm.expectRevert(ShiftGate.NotPassHolder.selector);
@@ -433,13 +451,7 @@ contract OnShiftTest is Test, OnShiftDeployer {
     function test_IncidentSwitch_holdsOnlyKeyScopedTextRights() public {
         // the switch can write the two incident keys and nothing else on the org resolver (C8)
         vm.prank(address(s.incidentSwitch));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PermissionedResolver.Unauthorized.selector,
-                ResolverRoles.ROLE_SET_TEXT,
-                address(s.incidentSwitch)
-            )
-        );
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
         s.parentResolver.setText(s.orgNode, "url", "https://phish.example");
     }
 
@@ -476,6 +488,12 @@ contract OnShiftTest is Test, OnShiftDeployer {
             } catch {}
         }
         assertLe(paid, cap);
-        assertEq(s.usdc.balanceOf(customer), paid);
+        assertEq(usdc.balanceOf(customer), paid);
+    }
+}
+
+contract OnShiftLocalTest is OnShiftSuite {
+    function _infra() internal override returns (Infra memory) {
+        return _deployLocalInfra();
     }
 }

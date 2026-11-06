@@ -3,17 +3,20 @@ pragma solidity ^0.8.24;
 
 import {IPermissionedRegistry} from "./interfaces/IPermissionedRegistry.sol";
 import {IPermissionedResolver} from "./interfaces/IPermissionedResolver.sol";
-import {ResolverFactory} from "./ensv2-local/ResolverFactory.sol";
+import {IVerifiableFactory} from "./interfaces/IVerifiableFactory.sol";
 import {RegistryRoles, ResolverRoles} from "./ensv2-local/Roles.sol";
 import {NameHash} from "./ensv2-local/NameHash.sol";
 import {OnShiftTypes} from "./OnShiftTypes.sol";
+import {PassResolverLib} from "./PassResolverLib.sol";
 
 /// @title PassIssuer
 /// @notice Issues expiring, non-transferable, least-privilege ENSv2 subnames ("passes") such as
-///         shift-0412.ops.acme.eth to staff wallets and AI agents.
+///         shift-0412.ops.onshift.eth to staff wallets and AI agents.
 ///
 ///         Design rules (each one answers a known ENSv2 pitfall):
-///         - C1  one PermissionedResolver PER PASS: resolver roles have no per-name scoping
+///         - C1  one PermissionedResolver PER PASS. Resolver grants are keyed by namehash, and a re-issued
+///               label has the same namehash, so a shared resolver would let a previous holder's grant
+///               survive into the next holder's pass. A fresh instance per pass makes that impossible.
 ///         - C4  roleBitmap = 0 on registration: nothing to transfer, re-point or delegate
 ///         - C5  this contract never holds ROLE_RENEW: extending a shift = a new pass + fresh resolver
 ///         - C7  everything keyed by labelhash; token IDs are treated as mutable
@@ -53,12 +56,14 @@ contract PassIssuer {
     uint256 public constant MAX_GAS_DRIP = 0.05 ether;
 
     IPermissionedRegistry public immutable PARENT;
-    ResolverFactory public immutable FACTORY;
+    IVerifiableFactory public immutable FACTORY;
     address public immutable RESOLVER_IMPL;
     address public immutable TREASURY;
     address public immutable ORG;
     bytes32 public immutable OPS_NODE;
     string public orgName;
+    /// @dev DNS-encoded "ops.<orgName>", used for per-name resolver grants.
+    bytes public opsDnsName;
 
     Preset[] internal _presets;
     Pass[] internal _passes;
@@ -104,11 +109,10 @@ contract PassIssuer {
 
     constructor(
         IPermissionedRegistry parent,
-        ResolverFactory factory,
+        IVerifiableFactory factory,
         address resolverImpl,
         address treasury,
         address org,
-        bytes32 opsNode,
         string memory orgName_
     ) {
         PARENT = parent;
@@ -116,8 +120,9 @@ contract PassIssuer {
         RESOLVER_IMPL = resolverImpl;
         TREASURY = treasury;
         ORG = org;
-        OPS_NODE = opsNode;
         orgName = orgName_;
+        opsDnsName = NameHash.dnsEncode(string.concat("ops.", orgName_));
+        OPS_NODE = NameHash.namehash(opsDnsName);
 
         // Default presets. Caps in USDC base units (6 decimals).
         _addPreset(
@@ -233,34 +238,24 @@ contract PassIssuer {
         string calldata agentContext
     ) internal returns (address resolver) {
         Preset storage preset = _presets[presetId];
-        bytes32 node = OPS_NODE.child(label);
-        resolver = FACTORY.deployProxy(
-            RESOLVER_IMPL,
-            keccak256(abi.encode(label, expiry, _passes.length)),
-            abi.encodeCall(IPermissionedResolver.initialize, (address(this)))
+        resolver = PassResolverLib.deploy(
+            PassResolverLib.Setup({
+                factory: FACTORY,
+                implementation: RESOLVER_IMPL,
+                salt: uint256(keccak256(abi.encode(label, expiry, _passes.length))),
+                node: OPS_NODE.child(label),
+                dnsName: NameHash.prepend(label, opsDnsName),
+                treasury: TREASURY,
+                org: ORG,
+                holder: holder,
+                orgName: orgName,
+                roleName: preset.name,
+                agentContext: preset.agent ? agentContext : "",
+                scope: OnShiftTypes.Scope({
+                    cap: cap, expiry: expiry, actions: preset.actions, presetId: presetId
+                })
+            })
         );
-        IPermissionedResolver r = IPermissionedResolver(resolver);
-
-        // issuer-only records
-        r.setAddr(node, OnShiftTypes.COIN_TYPE_ETH, abi.encodePacked(TREASURY));
-        r.setData(
-            node,
-            OnShiftTypes.KEY_SCOPE,
-            abi.encode(
-                OnShiftTypes.Scope({cap: cap, expiry: expiry, actions: preset.actions, presetId: presetId})
-            )
-        );
-        r.setText(node, OnShiftTypes.KEY_ORG, orgName);
-        r.setText(node, OnShiftTypes.KEY_ROLE, preset.name);
-        r.setText(node, OnShiftTypes.KEY_STATUS, "Starting shift");
-        if (preset.agent && bytes(agentContext).length > 0) {
-            r.setText(node, OnShiftTypes.KEY_AGENT_CONTEXT, agentContext);
-        }
-
-        // the holder may write exactly one text key, and nothing else
-        r.grantTextSetter(OnShiftTypes.KEY_STATUS, holder);
-        // the org multisig keeps admin (and ROLE_UPGRADE) over every pass resolver
-        r.grantRoles(ResolverRoles.ALL, ORG);
     }
 
     // ---------------------------------------------------------------- revocation
@@ -288,29 +283,12 @@ contract PassIssuer {
         return _passes[index];
     }
 
-    function getPassByLabel(string calldata label) external view returns (Pass memory pass, bool found) {
-        uint256 indexPlusOne = latestPassIndexPlusOne[keccak256(bytes(label))];
-        if (indexPlusOne == 0) return (pass, false);
-        return (_passes[indexPlusOne - 1], true);
-    }
-
     function presetCount() external view returns (uint256) {
         return _presets.length;
     }
 
     function getPreset(uint8 presetId) external view returns (Preset memory) {
         return _presets[presetId];
-    }
-
-    function remainingBudget(address lead) external view returns (uint32) {
-        Lead storage l = leads[lead];
-        if (!l.active) return 0;
-        uint32 used = issuedOnDay[lead][block.timestamp / 1 days];
-        return used >= l.dailyBudget ? 0 : l.dailyBudget - used;
-    }
-
-    function nodeOf(string calldata label) external view returns (bytes32) {
-        return OPS_NODE.child(label);
     }
 
     /// @dev Labels: 1-32 chars of [a-z0-9-], no leading/trailing hyphen (keeps names unambiguous).

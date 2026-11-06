@@ -4,193 +4,244 @@ pragma solidity ^0.8.24;
 import {IPermissionedRegistry} from "../interfaces/IPermissionedRegistry.sol";
 import {RegistryRoles} from "./Roles.sol";
 
-/// @title PermissionedRegistry (local ENSv2-semantics implementation)
-/// @notice A compact, self-contained registry that reproduces the ENSv2 behaviours OnShift is designed
-///         around, so the whole system can be exercised on a local chain and in unit tests:
-///         - names keyed by labelhash; token ID = labelId with a 32-bit version in the low bits
-///         - re-registration bumps the version, so grants made to an old token are void
-///         - expiry needs no transaction: ownerOf/getResolver/getSubregistry return 0 once expired
-///         - getState().latestOwner ignores expiry (consumers MUST check expiry themselves)
-///         - transfers need ROLE_CAN_TRANSFER_ADMIN on the token; ERC1155 operators inherit the
-///           owner's roles (so registering with roleBitmap = 0 leaves nothing to inherit)
-///         - renew() revives the previous owner AND roles (the trap OnShift's policy forbids)
-/// @dev On Sepolia, OnShift points at the real ENSv2 UserRegistry instead (see docs/ENSV2_MAPPING.md).
+/// @title PermissionedRegistry (local, ABI-compatible with ensdomains/contracts-v2 UserRegistry)
+/// @notice A compact re-implementation of the ENSv2 registry behaviours OnShift depends on, so the whole
+///         system runs on Anvil and in unit tests. The same OnShift contracts run unchanged on the real
+///         ENSv2 deployment on Sepolia (see test/SepoliaFork.t.sol and script/DeploySepolia.s.sol).
+///
+///         Mirrored semantics:
+///         - token ID and EAC resource = labelId with a 32-bit version in the low bits
+///         - an expired entry's resource is "the next version", so name-level roles go inert at expiry
+///           and come back if the name is renewed (revived)
+///         - unregister() burns the token and bumps both versions
+///         - getState().latestOwner ignores expiry; ownerOf / getResolver / getSubregistry do not
+///         - transfers need ROLE_CAN_TRANSFER_ADMIN; approved operators inherit the owner's roles
+///         - root roles apply to every resource; admin bits (role << 128) gate granting
 contract PermissionedRegistry is IPermissionedRegistry {
+    uint256 public constant ROOT_RESOURCE = 0;
+
     struct Entry {
-        address owner;
+        uint32 eacVersionId;
+        uint32 tokenVersionId;
         uint64 expiry;
-        uint32 version;
+        address owner; // ERC1155 owner of the current token (0 after burn)
         IPermissionedRegistry subregistry;
         address resolver;
     }
 
+    bool private _initialized;
     mapping(uint256 labelId => Entry) internal _entries;
-    mapping(uint256 labelId => string) public labelOf;
-    /// @dev Name roles are keyed by the full token ID, so a version bump invalidates them.
-    mapping(uint256 tokenId => mapping(address account => uint256)) internal _nameRoles;
-    mapping(address account => uint256) public rootRoles;
+    mapping(uint256 resource => mapping(address account => uint256)) internal _roles;
     mapping(address owner => mapping(address operator => bool)) public isApprovedForAll;
+    IPermissionedRegistry public parentRegistry;
+    string public childLabel;
 
-    event NameRegistered(uint256 indexed tokenId, string label, address indexed owner, uint64 expiry);
-    event NameUnregistered(uint256 indexed labelId, address indexed by);
-    event NameRenewed(uint256 indexed tokenId, uint64 newExpiry, address indexed by);
-    event SubregistryUpdated(uint256 indexed labelId, address subregistry);
-    event ResolverUpdated(uint256 indexed labelId, address resolver);
-    event RootRolesChanged(address indexed account, uint256 roles);
+    event LabelRegistered(uint256 indexed tokenId, string label, address indexed owner, uint64 expiry);
+    event LabelUnregistered(uint256 indexed tokenId, address indexed sender);
+    event ExpiryUpdated(uint256 indexed tokenId, uint64 newExpiry, address indexed sender);
+    event SubregistryUpdated(uint256 indexed tokenId, address subregistry, address indexed sender);
+    event ResolverUpdated(uint256 indexed tokenId, address resolver, address indexed sender);
+    event EACRolesChanged(
+        uint256 indexed resource, address indexed account, uint256 oldRoleBitmap, uint256 newRoleBitmap
+    );
     event TransferSingle(
         address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value
     );
     event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
 
-    error Unauthorized(uint256 role, address account);
-    error NameAlreadyRegistered(string label);
-    error NameNotRegistered(uint256 labelId);
-    error InvalidExpiry(uint64 expiry);
+    error EACUnauthorizedAccountRoles(uint256 resource, uint256 roleBitmap, address account);
+    error EACCannotGrantRoles(uint256 resource, uint256 roleBitmap, address account);
+    error LabelAlreadyRegistered(string label);
+    error LabelExpired(uint256 tokenId);
+    error CannotSetPastExpiry(uint64 expiry);
+    error CannotReduceExpiry(uint64 oldExpiry, uint64 newExpiry);
     error TransferDisallowed(uint256 tokenId, address from);
-    error NotTokenOwner(uint256 tokenId, address account);
+    error ERC1155MissingApprovalForAll(address operator, address owner);
+    error InvalidOwner();
+    error AlreadyInitialized();
 
-    constructor(address admin) {
-        if (admin != address(0)) {
-            rootRoles[admin] = type(uint256).max;
-            emit RootRolesChanged(admin, type(uint256).max);
-        }
+    /// @dev Lock the implementation; instances are proxies initialised through {initialize}.
+    constructor() {
+        _initialized = true;
+    }
+
+    function initialize(address rootAccount, uint256 roleBitmap) external {
+        if (_initialized) revert AlreadyInitialized();
+        if (rootAccount == address(0)) revert InvalidOwner();
+        _initialized = true;
+        _grant(ROOT_RESOURCE, roleBitmap, rootAccount);
     }
 
     // ---------------------------------------------------------------- access control
 
-    modifier onlyRoot(uint256 role) {
-        if (rootRoles[msg.sender] & role == 0) revert Unauthorized(role, msg.sender);
-        _;
+    function roles(uint256 anyId, address account) public view returns (uint256) {
+        uint256 resource = anyId == ROOT_RESOURCE ? ROOT_RESOURCE : _resource(anyId);
+        uint256 r = _roles[resource][account];
+        if (resource != ROOT_RESOURCE) {
+            Entry storage e = _entry(anyId);
+            address owner = _isExpired(e.expiry) ? address(0) : e.owner;
+            if (owner != address(0) && owner != account && isApprovedForAll[owner][account]) {
+                r |= _roles[resource][owner];
+            }
+        }
+        return r;
+    }
+
+    function hasRoles(uint256 resource, uint256 roleBitmap, address account) public view returns (bool) {
+        return (_roles[ROOT_RESOURCE][account] | roles(resource, account)) & roleBitmap == roleBitmap;
     }
 
     function hasRootRoles(uint256 roleBitmap, address account) public view returns (bool) {
-        return rootRoles[account] & roleBitmap == roleBitmap;
+        return _roles[ROOT_RESOURCE][account] & roleBitmap == roleBitmap;
     }
 
-    function grantRootRoles(uint256 roleBitmap, address account) external onlyRoot(RegistryRoles.ROLE_ADMIN) {
-        rootRoles[account] |= roleBitmap;
-        emit RootRolesChanged(account, rootRoles[account]);
+    function grantRootRoles(uint256 roleBitmap, address account) external returns (bool) {
+        _checkCanGrant(ROOT_RESOURCE, roleBitmap);
+        _grant(ROOT_RESOURCE, roleBitmap, account);
+        return true;
     }
 
-    function revokeRootRoles(uint256 roleBitmap, address account)
-        external
-        onlyRoot(RegistryRoles.ROLE_ADMIN)
-    {
-        rootRoles[account] &= ~roleBitmap;
-        emit RootRolesChanged(account, rootRoles[account]);
+    function revokeRootRoles(uint256 roleBitmap, address account) external returns (bool) {
+        _checkCanGrant(ROOT_RESOURCE, roleBitmap);
+        uint256 old = _roles[ROOT_RESOURCE][account];
+        _roles[ROOT_RESOURCE][account] = old & ~roleBitmap;
+        emit EACRolesChanged(ROOT_RESOURCE, account, old, old & ~roleBitmap);
+        return true;
     }
 
-    /// @notice Roles `account` effectively holds on a live token: its own, or the owner's if approved.
-    function roles(uint256 tokenId, address account) public view returns (uint256) {
-        address owner = ownerOf(tokenId);
-        if (owner == address(0)) return 0;
-        if (account == owner || isApprovedForAll[owner][account]) return _nameRoles[tokenId][owner];
-        return _nameRoles[tokenId][account];
+    function _checkCanGrant(uint256 resource, uint256 roleBitmap) internal view {
+        uint256 held = _roles[ROOT_RESOURCE][msg.sender] | _roles[resource][msg.sender];
+        uint256 adminBits = held >> 128;
+        uint256 settable = adminBits | (adminBits << 128);
+        if (roleBitmap & ~settable != 0) revert EACCannotGrantRoles(resource, roleBitmap, msg.sender);
     }
 
-    function _checkNameOrRoot(uint256 labelId, uint256 role) internal view {
-        if (rootRoles[msg.sender] & role != 0) return;
-        if (roles(_tokenId(labelId), msg.sender) & role != 0) return;
-        revert Unauthorized(role, msg.sender);
+    function _checkRoles(uint256 resource, uint256 roleBitmap) internal view {
+        if (!hasRoles(resource, roleBitmap, msg.sender)) {
+            revert EACUnauthorizedAccountRoles(resource, roleBitmap, msg.sender);
+        }
     }
 
-    // ---------------------------------------------------------------- registration lifecycle
+    function _grant(uint256 resource, uint256 roleBitmap, address account) internal {
+        uint256 old = _roles[resource][account];
+        _roles[resource][account] = old | roleBitmap;
+        emit EACRolesChanged(resource, account, old, old | roleBitmap);
+    }
+
+    // ---------------------------------------------------------------- lifecycle
 
     function register(
         string calldata label,
         address owner,
-        IPermissionedRegistry subregistry,
+        IPermissionedRegistry registry,
         address resolver,
         uint256 roleBitmap,
         uint64 expiry
-    ) external onlyRoot(RegistryRoles.ROLE_REGISTRAR) returns (uint256 tokenId) {
+    ) external returns (uint256 tokenId) {
+        if (owner == address(0)) revert InvalidOwner();
         uint256 id = _labelId(uint256(keccak256(bytes(label))));
         Entry storage e = _entries[id];
-        if (_isLive(e)) revert NameAlreadyRegistered(label);
-        if (expiry <= block.timestamp) revert InvalidExpiry(expiry);
+        if (!_isExpired(e.expiry)) revert LabelAlreadyRegistered(label);
+        _checkRoles(ROOT_RESOURCE, RegistryRoles.ROLE_REGISTRAR);
+        if (_isExpired(expiry)) revert CannotSetPastExpiry(expiry);
 
-        e.version += 1;
+        if (e.owner != address(0)) {
+            // burn the expired token: grants on the old resource can never come back
+            emit TransferSingle(msg.sender, e.owner, address(0), _tokenId(id, e), 1);
+            ++e.eacVersionId;
+            ++e.tokenVersionId;
+        }
         e.owner = owner;
         e.expiry = expiry;
-        e.subregistry = subregistry;
+        e.subregistry = registry;
         e.resolver = resolver;
-        labelOf[id] = label;
 
-        tokenId = id | e.version;
-        _nameRoles[tokenId][owner] = roleBitmap;
-
-        emit NameRegistered(tokenId, label, owner, expiry);
+        tokenId = _tokenId(id, e);
+        emit LabelRegistered(tokenId, label, owner, expiry);
         emit TransferSingle(msg.sender, address(0), owner, tokenId, 1);
+        if (roleBitmap != 0) _grant(_resource(id), roleBitmap, owner);
     }
 
-    /// @notice Ends a registration early. The entry keeps its latestOwner, like an expiry would.
-    function unregister(uint256 anyId) external onlyRoot(RegistryRoles.ROLE_UNREGISTER) {
-        uint256 id = _labelId(anyId);
-        Entry storage e = _entries[id];
-        if (!_isLive(e)) revert NameNotRegistered(id);
-        e.expiry = uint64(block.timestamp);
-        emit NameUnregistered(id, msg.sender);
-    }
-
-    /// @notice Extends (or REVIVES) a registration with its previous owner, token and roles.
-    function renew(uint256 anyId, uint64 newExpiry) external {
-        uint256 id = _labelId(anyId);
-        Entry storage e = _entries[id];
-        if (e.owner == address(0)) revert NameNotRegistered(id);
-        if (rootRoles[msg.sender] & RegistryRoles.ROLE_RENEW == 0) {
-            revert Unauthorized(RegistryRoles.ROLE_RENEW, msg.sender);
+    function unregister(uint256 anyId) external {
+        (uint256 tokenId, Entry storage e) = _checkExpiryAndTokenRoles(anyId, RegistryRoles.ROLE_UNREGISTER);
+        emit LabelUnregistered(tokenId, msg.sender);
+        if (e.owner != address(0)) {
+            emit TransferSingle(msg.sender, e.owner, address(0), tokenId, 1);
+            e.owner = address(0);
+            ++e.eacVersionId;
+            ++e.tokenVersionId;
         }
-        if (newExpiry <= e.expiry || newExpiry <= block.timestamp) revert InvalidExpiry(newExpiry);
+        e.expiry = uint64(block.timestamp);
+    }
+
+    /// @notice Extends, or for an expired name REVIVES (root ROLE_RENEW), keeping owner and roles.
+    function renew(uint256 anyId, uint64 newExpiry) external {
+        Entry storage e = _entry(anyId);
+        uint256 tokenId = _tokenId(_labelId(anyId), e);
+        if (_isExpired(e.expiry)) {
+            if (e.expiry == 0 || !hasRootRoles(RegistryRoles.ROLE_RENEW, msg.sender)) {
+                revert LabelExpired(tokenId);
+            }
+        } else {
+            _checkRoles(_resource(anyId), RegistryRoles.ROLE_RENEW);
+        }
+        if (newExpiry < e.expiry) revert CannotReduceExpiry(e.expiry, newExpiry);
         e.expiry = newExpiry;
-        emit NameRenewed(id | e.version, newExpiry, msg.sender);
+        emit ExpiryUpdated(tokenId, newExpiry, msg.sender);
     }
 
     function setSubregistry(uint256 anyId, IPermissionedRegistry registry) external {
-        uint256 id = _labelId(anyId);
-        _checkNameOrRoot(id, RegistryRoles.ROLE_SET_SUBREGISTRY);
-        _entries[id].subregistry = registry;
-        emit SubregistryUpdated(id, address(registry));
+        (uint256 tokenId, Entry storage e) =
+            _checkExpiryAndTokenRoles(anyId, RegistryRoles.ROLE_SET_SUBREGISTRY);
+        e.subregistry = registry;
+        emit SubregistryUpdated(tokenId, address(registry), msg.sender);
     }
 
     function setResolver(uint256 anyId, address resolver) external {
-        uint256 id = _labelId(anyId);
-        _checkNameOrRoot(id, RegistryRoles.ROLE_SET_RESOLVER);
-        _entries[id].resolver = resolver;
-        emit ResolverUpdated(id, resolver);
+        (uint256 tokenId, Entry storage e) = _checkExpiryAndTokenRoles(anyId, RegistryRoles.ROLE_SET_RESOLVER);
+        e.resolver = resolver;
+        emit ResolverUpdated(tokenId, resolver, msg.sender);
+    }
+
+    function setParent(IPermissionedRegistry parent, string calldata label) external {
+        _checkRoles(ROOT_RESOURCE, RegistryRoles.ROLE_SET_PARENT);
+        parentRegistry = parent;
+        childLabel = label;
     }
 
     // ---------------------------------------------------------------- views
 
     function getState(uint256 anyId) external view returns (State memory s) {
-        uint256 id = _labelId(anyId);
-        Entry storage e = _entries[id];
-        s.status = _isLive(e) ? Status.REGISTERED : Status.AVAILABLE;
+        Entry storage e = _entry(anyId);
         s.expiry = e.expiry;
+        s.tokenId = _tokenId(_labelId(anyId), e);
+        s.resource = _resource(anyId);
         s.latestOwner = e.owner;
-        s.tokenId = id | e.version;
+        s.status = _isExpired(e.expiry)
+            ? Status.AVAILABLE
+            : e.owner == address(0) ? Status.RESERVED : Status.REGISTERED;
     }
 
     function ownerOf(uint256 tokenId) public view returns (address) {
-        uint256 id = _labelId(tokenId);
-        Entry storage e = _entries[id];
-        if (!_isLive(e) || tokenId != (id | e.version)) return address(0);
+        Entry storage e = _entry(tokenId);
+        if (tokenId != _tokenId(_labelId(tokenId), e) || _isExpired(e.expiry)) return address(0);
         return e.owner;
     }
 
     function getSubregistry(string calldata label) external view returns (IPermissionedRegistry) {
-        Entry storage e = _entries[_labelId(uint256(keccak256(bytes(label))))];
-        return _isLive(e) ? e.subregistry : IPermissionedRegistry(address(0));
+        Entry storage e = _entry(uint256(keccak256(bytes(label))));
+        return _isExpired(e.expiry) ? IPermissionedRegistry(address(0)) : e.subregistry;
     }
 
     function getResolver(string calldata label) external view returns (address) {
-        Entry storage e = _entries[_labelId(uint256(keccak256(bytes(label))))];
-        return _isLive(e) ? e.resolver : address(0);
+        Entry storage e = _entry(uint256(keccak256(bytes(label))));
+        return _isExpired(e.expiry) ? address(0) : e.resolver;
     }
 
-    // ---------------------------------------------------------------- minimal ERC1155 surface
+    // ---------------------------------------------------------------- minimal ERC1155
 
     function balanceOf(address account, uint256 tokenId) external view returns (uint256) {
-        return ownerOf(tokenId) == account && account != address(0) ? 1 : 0;
+        return account != address(0) && ownerOf(tokenId) == account ? 1 : 0;
     }
 
     function setApprovalForAll(address operator, bool approved) external {
@@ -201,30 +252,53 @@ contract PermissionedRegistry is IPermissionedRegistry {
     function safeTransferFrom(address from, address to, uint256 tokenId, uint256 amount, bytes calldata)
         external
     {
-        if (amount != 1 || ownerOf(tokenId) != from) revert NotTokenOwner(tokenId, from);
         if (msg.sender != from && !isApprovedForAll[from][msg.sender]) {
-            revert NotTokenOwner(tokenId, msg.sender);
+            revert ERC1155MissingApprovalForAll(msg.sender, from);
         }
-        uint256 held = _nameRoles[tokenId][from];
-        if (held & RegistryRoles.ROLE_CAN_TRANSFER_ADMIN == 0) revert TransferDisallowed(tokenId, from);
-
-        _entries[_labelId(tokenId)].owner = to;
-        delete _nameRoles[tokenId][from];
-        _nameRoles[tokenId][to] = held;
+        if (amount != 1 || ownerOf(tokenId) != from) revert InvalidOwner();
+        uint256 resource = _resource(tokenId);
+        if (_roles[resource][from] & RegistryRoles.ROLE_CAN_TRANSFER_ADMIN == 0) {
+            revert TransferDisallowed(tokenId, from);
+        }
+        Entry storage e = _entry(tokenId);
+        e.owner = to;
+        _roles[resource][to] = _roles[resource][from];
+        delete _roles[resource][from];
         emit TransferSingle(msg.sender, from, to, tokenId, 1);
     }
 
     // ---------------------------------------------------------------- internals
 
+    function _checkExpiryAndTokenRoles(uint256 anyId, uint256 roleBitmap)
+        internal
+        view
+        returns (uint256 tokenId, Entry storage e)
+    {
+        e = _entry(anyId);
+        tokenId = _tokenId(_labelId(anyId), e);
+        if (_isExpired(e.expiry)) revert LabelExpired(tokenId);
+        _checkRoles(_resource(anyId), roleBitmap);
+    }
+
     function _labelId(uint256 anyId) internal pure returns (uint256) {
-        return anyId & ~uint256(0xffffffff);
+        return anyId ^ uint32(anyId);
     }
 
-    function _tokenId(uint256 labelId) internal view returns (uint256) {
-        return labelId | _entries[labelId].version;
+    function _entry(uint256 anyId) internal view returns (Entry storage) {
+        return _entries[_labelId(anyId)];
     }
 
-    function _isLive(Entry storage e) internal view returns (bool) {
-        return e.owner != address(0) && block.timestamp < e.expiry;
+    function _tokenId(uint256 labelId, Entry storage e) internal view returns (uint256) {
+        return labelId | e.tokenVersionId;
+    }
+
+    /// @dev The resource of an expired entry is the NEXT version, so its roles are inert until revived.
+    function _resource(uint256 anyId) internal view returns (uint256) {
+        Entry storage e = _entry(anyId);
+        return _labelId(anyId) | (_isExpired(e.expiry) ? e.eacVersionId + 1 : e.eacVersionId);
+    }
+
+    function _isExpired(uint64 expiry) internal view returns (bool) {
+        return block.timestamp >= expiry;
     }
 }
