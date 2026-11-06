@@ -18,5 +18,8 @@ app/src/generated/deployments.json
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Product docs stay on disk only
+docs/
 contracts/broadcast/**/dry-run/
 contracts/broadcast/**/run-[0-9]*.json
