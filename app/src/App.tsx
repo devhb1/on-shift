@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Clock3,
   CreditCard,
+  FlaskConical,
   LayoutGrid,
   ListChecks,
   Moon,
@@ -31,8 +32,9 @@ import { DeviceApp } from "./pages/DeviceApp";
 import { Verify } from "./pages/Verify";
 import { Setup } from "./pages/Setup";
 import { PayPage } from "./pages/PayPage";
+import { TryPage } from "./pages/TryPage";
 
-export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify" | "pay";
+export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify" | "pay" | "try";
 
 const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof Activity }[] }[] = [
   {
@@ -59,7 +61,7 @@ const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof 
   },
 ];
 
-const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify", "pay"];
+const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify", "pay", "try"];
 
 function parseHash(): { route: Route; params: URLSearchParams } {
   const [path, query] = window.location.hash.replace(/^#\/?/, "").split("?");
@@ -171,6 +173,9 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
             <button className="nav-item" onClick={() => navigate("device")}>
               <Smartphone size={17} /> Staff App
             </button>
+            <button className="nav-item" onClick={() => navigate("try")}>
+              <FlaskConical size={17} /> Playground
+            </button>
             <button className="nav-item" onClick={() => navigate("pay")}>
               <CreditCard size={17} /> Customer Pay
             </button>
@@ -224,10 +229,10 @@ export function App() {
       </>
     );
   }
-  if (route === "pay") {
+  if (route === "pay" || route === "try") {
     return (
       <>
-        {notReady ? <Setup error={error} /> : !snapshot ? loading : <PayPage />}
+        {notReady ? <Setup error={error} /> : !snapshot ? loading : route === "pay" ? <PayPage /> : <TryPage />}
         <Toasts />
       </>
     );
