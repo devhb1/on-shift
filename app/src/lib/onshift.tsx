@@ -88,9 +88,106 @@ type RawPass = {
   cap: bigint;
 };
 
-async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<bigint, number>): Promise<Snapshot> {
+type IssuerLog = Awaited<ReturnType<typeof pullIssuer>>[number];
+type GateLog = Awaited<ReturnType<typeof pullGate>>[number];
+type SwitchLog = Awaited<ReturnType<typeof pullSwitch>>[number];
+
+type EventCache = {
+  /** Last block included in the cached logs. -1 before the first successful read. */
+  tip: bigint;
+  issuer: IssuerLog[];
+  gate: GateLog[];
+  sw: SwitchLog[];
+};
+
+const pullIssuer = (from: bigint, to: bigint) =>
+  publicClient.getContractEvents({ address: deployment!.passIssuer, abi: passIssuerAbi, fromBlock: from, toBlock: to });
+const pullGate = (from: bigint, to: bigint) =>
+  publicClient.getContractEvents({ address: deployment!.shiftGate, abi: shiftGateAbi, fromBlock: from, toBlock: to });
+const pullSwitch = (from: bigint, to: bigint) =>
+  publicClient.getContractEvents({ address: deployment!.incidentSwitch, abi: incidentSwitchAbi, fromBlock: from, toBlock: to });
+
+function isRangeError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /block range|too many|query returned more|exceed|response size|log limit|10[,.]?000/i.test(message);
+}
+
+/** One getLogs when the RPC allows it. Public endpoints often cap the span, so fall back to chunks. */
+async function collect<T>(fromBlock: bigint, toBlock: bigint, pull: (from: bigint, to: bigint) => Promise<readonly T[]>): Promise<T[]> {
+  if (fromBlock > toBlock) return [];
+  try {
+    return [...(await pull(fromBlock, toBlock))];
+  } catch (error) {
+    if (!isRangeError(error)) throw error;
+    const span = 9_999n;
+    const all: T[] = [];
+    for (let start = fromBlock; start <= toBlock; start += span) {
+      const end = start + span - 1n > toBlock ? toBlock : start + span - 1n;
+      all.push(...(await pull(start, end)));
+    }
+    return all;
+  }
+}
+
+function mergeLogs<T extends { transactionHash: string; logIndex: number | null }>(prev: T[], next: T[]): T[] {
+  if (next.length === 0) return prev;
+  const seen = new Set(prev.map((log) => `${log.transactionHash}:${log.logIndex}`));
+  const extra = next.filter((log) => !seen.has(`${log.transactionHash}:${log.logIndex}`));
+  return extra.length === 0 ? prev : [...prev, ...extra];
+}
+
+async function syncLogs(cache: EventCache, toBlock: bigint) {
+  const startBlock = BigInt(deployment!.startBlock);
+  if (cache.tip > toBlock) {
+    cache.tip = -1n;
+    cache.issuer = [];
+    cache.gate = [];
+    cache.sw = [];
+  }
+  const from = cache.tip < startBlock ? startBlock : cache.tip > startBlock + 20n ? cache.tip - 20n : startBlock;
+  if (from > toBlock) return;
+  const [issuer, gate, sw] = await Promise.all([
+    collect(from, toBlock, pullIssuer),
+    collect(from, toBlock, pullGate),
+    collect(from, toBlock, pullSwitch),
+  ]);
+  cache.issuer = mergeLogs(cache.issuer, issuer);
+  cache.gate = mergeLogs(cache.gate, gate);
+  cache.sw = mergeLogs(cache.sw, sw);
+  cache.tip = toBlock;
+}
+
+type BatchCall = { address: Address; abi: typeof passIssuerAbi | typeof shiftGateAbi; functionName: string; args: readonly unknown[] };
+
+async function readEach<T>(calls: readonly BatchCall[]): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < calls.length; i += 8) {
+    const slice = calls.slice(i, i + 8);
+    const part = await Promise.all(slice.map((call) => publicClient.readContract(call as never)));
+    out.push(...(part as T[]));
+  }
+  return out;
+}
+
+/** One Multicall3 eth_call when the chain has it. Anvil without that predeploy falls back to single reads. */
+async function batched<T>(calls: readonly BatchCall[]): Promise<T[]> {
+  if (calls.length === 0) return [];
+  try {
+    const out: T[] = [];
+    for (let i = 0; i < calls.length; i += 40) {
+      const part = await publicClient.multicall({ allowFailure: false, contracts: calls.slice(i, i + 40) as never });
+      out.push(...(part as T[]));
+    }
+    return out;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/multicall3/i.test(message)) throw error;
+    return readEach<T>(calls);
+  }
+}
+
+async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<bigint, number>, events: EventCache): Promise<Snapshot> {
   const d = deployment!;
-  const fromBlock = BigInt(d.startBlock);
 
   const [block, currentOps, incident, incidentReason, epoch, gateFloat, passCount, presetCount] = await Promise.all([
     publicClient.getBlock({ blockTag: "latest" }),
@@ -103,29 +200,44 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "presetCount" }),
   ]);
   const blockTs = Number(block.timestamp);
+  const tip = block.number ?? 0n;
 
-  const presets: Preset[] = await Promise.all(
-    Array.from({ length: Number(presetCount) }, async (_, id) => {
-      const p = await publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "getPreset", args: [id] });
-      return { id, name: p.name, maxCap: p.maxCap, maxDuration: Number(p.maxDuration), actions: p.actions, agent: p.agent, active: p.active };
-    }),
+  const presetRows = await batched<{ name: string; maxCap: bigint; maxDuration: bigint; actions: number; agent: boolean; active: boolean }>(
+    Array.from({ length: Number(presetCount) }, (_, id) => ({
+      address: d.passIssuer,
+      abi: passIssuerAbi,
+      functionName: "getPreset",
+      args: [id],
+    })),
   );
+  const presets: Preset[] = presetRows.map((p, id) => ({
+    id,
+    name: p.name,
+    maxCap: p.maxCap,
+    maxDuration: Number(p.maxDuration),
+    actions: p.actions,
+    agent: p.agent,
+    active: p.active,
+  }));
 
   // Pass records are immutable once issued: fetch each index once (reset if the chain was restarted).
-  if (passCache.size > Number(passCount)) passCache.clear();
-  await Promise.all(
-    Array.from({ length: Number(passCount) }, async (_, i) => {
-      if (passCache.has(i)) return;
-      const p = await publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "getPass", args: [BigInt(i)] });
-      passCache.set(i, p as RawPass);
-    }),
+  if (passCache.size > Number(passCount)) {
+    passCache.clear();
+    events.tip = -1n;
+    events.issuer = [];
+    events.gate = [];
+    events.sw = [];
+  }
+  const missing = Array.from({ length: Number(passCount) }, (_, i) => i).filter((i) => !passCache.has(i));
+  const fetched = await batched<RawPass>(
+    missing.map((i) => ({ address: d.passIssuer, abi: passIssuerAbi, functionName: "getPass", args: [BigInt(i)] })),
   );
+  missing.forEach((i, n) => passCache.set(i, fetched[n]));
 
-  const [issuerLogs, gateLogs, switchLogs] = await Promise.all([
-    publicClient.getContractEvents({ address: d.passIssuer, abi: passIssuerAbi, fromBlock }),
-    publicClient.getContractEvents({ address: d.shiftGate, abi: shiftGateAbi, fromBlock }),
-    publicClient.getContractEvents({ address: d.incidentSwitch, abi: incidentSwitchAbi, fromBlock }),
-  ]);
+  await syncLogs(events, tip);
+  const issuerLogs = events.issuer;
+  const gateLogs = events.gate;
+  const switchLogs = events.sw;
   const revoked = new Set<number>();
   for (const log of issuerLogs) if (log.eventName === "PassRevoked") revoked.add(Number(log.args.index));
 
@@ -133,44 +245,54 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
   const latestByLabel = new Map<string, number>();
   for (const [i, p] of raws) latestByLabel.set(p.label, i);
 
-  const passes: PassRow[] = await Promise.all(
-    raws.map(async ([index, p]) => {
-      const isLatestForLabel = latestByLabel.get(p.label) === index;
-      const shiftKey = keccak256(
-        encodeAbiParameters([{ type: "address" }, { type: "uint256" }, { type: "uint64" }], [p.registry, labelId(p.label), p.expiry]),
-      );
-      const spent = await publicClient.readContract({ address: d.shiftGate, abi: shiftGateAbi, functionName: "spent", args: [shiftKey] });
-
-      let state: PassState;
-      let shiftStatus = "";
-      const expired = blockTs >= Number(p.expiry);
-      if (revoked.has(index)) state = "revoked";
-      else if (!isLatestForLabel || expired) state = "expired";
-      else if (!sameAddress(p.registry, currentOps)) state = "killed";
-      else {
-        const st = await publicClient.readContract({ address: d.shiftGate, abi: shiftGateAbi, functionName: "passStatus", args: [p.label] });
-        state = st.live ? "live" : "revoked";
-        shiftStatus = st.shiftStatus;
-      }
-      return {
-        index,
-        label: p.label,
-        name: `${p.label}.ops.${d.orgName}`,
-        holder: p.holder,
-        issuer: p.issuer,
-        resolver: p.resolver,
-        registry: p.registry,
-        issuedAt: Number(p.issuedAt),
-        expiry: Number(p.expiry),
-        presetId: p.presetId,
-        cap: p.cap,
-        spent,
-        state,
-        shiftStatus,
-        isLatestForLabel,
-      };
-    }),
+  const shiftKeys = raws.map(([, p]) =>
+    keccak256(encodeAbiParameters([{ type: "address" }, { type: "uint256" }, { type: "uint64" }], [p.registry, labelId(p.label), p.expiry])),
   );
+  const spentValues = await batched<bigint>(
+    shiftKeys.map((shiftKey) => ({ address: d.shiftGate, abi: shiftGateAbi, functionName: "spent", args: [shiftKey] })),
+  );
+  const liveCandidates = raws
+    .map(([index, p], i) => ({ index, p, i }))
+    .filter(({ index, p }) => {
+      const expired = blockTs >= Number(p.expiry);
+      return !revoked.has(index) && latestByLabel.get(p.label) === index && !expired && sameAddress(p.registry, currentOps);
+    });
+  const statuses = await batched<{ live: boolean; shiftStatus: string }>(
+    liveCandidates.map(({ p }) => ({ address: d.shiftGate, abi: shiftGateAbi, functionName: "passStatus", args: [p.label] })),
+  );
+  const statusByIndex = new Map(liveCandidates.map(({ index }, n) => [index, statuses[n]]));
+
+  const passes: PassRow[] = raws.map(([index, p], i) => {
+    const isLatestForLabel = latestByLabel.get(p.label) === index;
+    const expired = blockTs >= Number(p.expiry);
+    let state: PassState;
+    let shiftStatus = "";
+    if (revoked.has(index)) state = "revoked";
+    else if (!isLatestForLabel || expired) state = "expired";
+    else if (!sameAddress(p.registry, currentOps)) state = "killed";
+    else {
+      const st = statusByIndex.get(index);
+      state = st?.live ? "live" : "revoked";
+      shiftStatus = st?.shiftStatus ?? "";
+    }
+    return {
+      index,
+      label: p.label,
+      name: `${p.label}.ops.${d.orgName}`,
+      holder: p.holder,
+      issuer: p.issuer,
+      resolver: p.resolver,
+      registry: p.registry,
+      issuedAt: Number(p.issuedAt),
+      expiry: Number(p.expiry),
+      presetId: p.presetId,
+      cap: p.cap,
+      spent: spentValues[i] ?? 0n,
+      state,
+      shiftStatus,
+      isLatestForLabel,
+    };
+  });
 
   // Leads from events, then their remaining budget for today.
   const leadMap = new Map<string, { address: Address; dailyBudget: number; active: boolean }>();
@@ -179,23 +301,24 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
       leadMap.set(log.args.lead!.toLowerCase(), { address: log.args.lead!, dailyBudget: Number(log.args.dailyBudget), active: !!log.args.active });
     }
   }
-  const leads: Lead[] = await Promise.all(
-    [...leadMap.values()].map(async (l) => ({
-      ...l,
-      remaining: Math.max(
-        0,
-        l.dailyBudget -
-          Number(await publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "issuedOnDay", args: [l.address, BigInt(Math.floor(blockTs / 86400))] })),
-      ),
-    })),
+  const leadList = [...leadMap.values()];
+  const day = BigInt(Math.floor(blockTs / 86400));
+  const issuedToday = await batched<bigint>(
+    leadList.map((l) => ({ address: d.passIssuer, abi: passIssuerAbi, functionName: "issuedOnDay", args: [l.address, day] })),
   );
+  const leads: Lead[] = leadList.map((l, i) => ({
+    ...l,
+    remaining: Math.max(0, l.dailyBudget - Number(issuedToday[i] ?? 0n)),
+  }));
 
-  // Activity feed with block timestamps.
+  // Activity feed with block timestamps. New blocks only; a handful at a time so a public RPC isn't flooded.
   const all = [...issuerLogs, ...gateLogs, ...switchLogs];
-  const missing = [...new Set(all.map((l) => l.blockNumber))].filter((n) => !blockTimes.has(n));
-  await Promise.all(
-    missing.map(async (n) => blockTimes.set(n, Number((await publicClient.getBlock({ blockNumber: n })).timestamp))),
-  );
+  const unseenBlocks = [...new Set(all.map((l) => l.blockNumber))].filter((n) => !blockTimes.has(n));
+  for (let i = 0; i < unseenBlocks.length; i += 8) {
+    const slice = unseenBlocks.slice(i, i + 8);
+    const stamps = await Promise.all(slice.map(async (n) => Number((await publicClient.getBlock({ blockNumber: n })).timestamp)));
+    slice.forEach((n, j) => blockTimes.set(n, stamps[j]));
+  }
   const presetName = (id: number) => presets[id]?.name ?? "Pass";
   const activity: ActivityItem[] = [];
   for (const log of all) {
@@ -246,6 +369,7 @@ export function OnShiftProvider({ children }: { children: ReactNode }) {
   const [chainOffset, setChainOffset] = useState(0);
   const passCache = useRef(new Map<number, RawPass>());
   const blockTimes = useRef(new Map<bigint, number>());
+  const events = useRef<EventCache>({ tip: -1n, issuer: [], gate: [], sw: [] });
   const inFlight = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -256,7 +380,7 @@ export function OnShiftProvider({ children }: { children: ReactNode }) {
     if (inFlight.current) return inFlight.current;
     inFlight.current = (async () => {
       try {
-        const s = await loadSnapshot(passCache.current, blockTimes.current);
+        const s = await loadSnapshot(passCache.current, blockTimes.current, events.current);
         setSnapshot(s);
         setChainOffset(s.blockTs - Date.now() / 1000);
         setError(undefined);
