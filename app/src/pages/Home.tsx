@@ -9,15 +9,15 @@ import { ThemeToggle, navigate, type Route } from "../App";
 const REPO = "https://github.com/devhb1/onshift";
 
 const DOORS: { route: Route; icon: typeof Clock3; title: string; body: string; cta: string }[] = [
-  { route: "try", icon: FlaskConical, title: "Try it as a team lead", body: "Issue a real pass on the live deployment with your own wallet. Up to an hour, up to $5.", cta: "Open Playground" },
-  { route: "device", icon: Smartphone, title: "I'm on shift", body: "Your pass, your limits and nothing else. The key stays on this device.", cta: "Open Staff App" },
-  { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Is this person or agent working for them right now? One ENS lookup, no account.", cta: "Open Public Check" },
+  { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Paste a name. If they DMed you as support, this is the check. No account.", cta: "Open Public Check" },
+  { route: "try", icon: FlaskConical, title: "Issue a pass", body: "Any wallet can mint a real ENSv2 name on this deployment. An hour, $5, then it dies.", cta: "Open Playground" },
+  { route: "device", icon: Smartphone, title: "I'm on shift", body: "Refunds only go back to the wallet that paid. You cannot pick a recipient.", cta: "Open Staff App" },
 ];
 
 const STEPS: { icon: typeof Clock3; title: string; body: string }[] = [
-  { icon: Clock3, title: "Issue", body: "A lead gives a phone or an AI agent an ENSv2 name such as shift-0412.ops.onshift.eth, with its own resolver, a cap and an expiry." },
-  { icon: ShieldCheck, title: "Work", body: "The pass can refund paid orders up to its cap, and only back to the wallet that paid. It cannot be transferred, extended or re-pointed." },
-  { icon: TimerOff, title: "Expire", body: "When the shift ends the name stops resolving and the gate refuses it. Nobody has to send a transaction. Break-glass ends every pass at once." },
+  { icon: BadgeCheck, title: "Check", body: "A stranger resolves the name through ENS. On shift or not, with no app login and no trust in this website." },
+  { icon: ShieldCheck, title: "Pay and refund", body: "The till only sends money back to the wallet that paid that order. A stolen phone cannot redirect it." },
+  { icon: TimerOff, title: "Clock out", body: "The name expires by itself. Break-glass aliases the till to quarantine and re-points ops, so every human and agent fails the same check." },
 ];
 
 export function Home() {
@@ -47,9 +47,9 @@ export function Home() {
       </header>
 
       <section className="landing-hero">
-        <h1 className="landing-title">Keys that clock out.</h1>
+        <h1 className="landing-title">A fake support agent fails this check.</h1>
         <p className="landing-sub">
-          Give staff and AI agents an ENS name for one shift, not a key forever. Every pass is time-boxed, budget-capped and checkable by anyone.
+          A real one can only send money back to you. Staff and AI agents get an ENS name for one shift — anyone can resolve it, and the till will not pay a different wallet.
         </p>
         <form
           className="landing-check"

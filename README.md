@@ -4,9 +4,9 @@
 
 # OnShift
 
-**Authority that expires.** Verifiable, least-privilege, self-expiring passes for staff and AI agents — live on **ENSv2 (Sepolia)**.
+**A fake support agent fails this check.** A real one can only send money back to you. Staff and AI agents get an ENSv2 name for one shift — live on **Sepolia**.
 
-`shift-0412.ops.onshift.eth` proves to any wallet or contract that its holder acts for **onshift.eth** *right now*, lets them touch only what you allow, can never be transferred, and stops working by itself when the shift ends. Nobody has to remember to revoke it.
+`shift-0412.ops.onshift.eth` proves to any wallet or contract that its holder acts for **onshift.eth** *right now*, lets them touch only what you allow, can never be transferred, and stops working by itself when the shift ends. Refunds are bound to the paying wallet. Nobody has to remember to revoke it.
 
 ![Tests](https://img.shields.io/badge/tests-34%20local%20%2B%2034%20on%20real%20ENSv2%20fork-34c759)
 ![Sepolia](https://img.shields.io/badge/live-Sepolia%20ENSv2-0071e3)

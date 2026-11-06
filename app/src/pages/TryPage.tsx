@@ -28,7 +28,8 @@ export function TryPage() {
   const me = operator?.signer.address;
 
   const presets = s.presets.filter((p) => p.active && (p.name === "Cashier" || p.agent || p.name === "Door staff"));
-  const [presetId, setPresetId] = useState(presets[0]?.id ?? 0);
+  const agentPreset = presets.find((p) => p.agent);
+  const [presetId, setPresetId] = useState(agentPreset?.id ?? presets[0]?.id ?? 0);
   const [seconds, setSeconds] = useState("1800");
   const [cap, setCap] = useState(String(MAX_CAP));
   const [holderChoice, setHolderChoice] = useState<"new" | "paste">("new");
@@ -111,7 +112,7 @@ export function TryPage() {
       <div style={{ textAlign: "center", padding: "12px 0 0" }}>
         <h1 className="large-title">Try OnShift</h1>
         <p className="page-sub">
-          Be a shift lead for a minute. Issue a real pass on {d.orgName}, use it on a staff device, then watch it stop by itself. Playground passes last up to an hour and can refund up to ${MAX_CAP}.
+          Issue a real ENSv2 name, pay an order, then try to refund it to yourself — the chain refuses. Default role is an AI agent so the name is something a stranger can check. Up to an hour, up to ${MAX_CAP}.
         </p>
       </div>
 
