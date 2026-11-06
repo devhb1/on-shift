@@ -23,7 +23,7 @@ export function Gate({ need, what, children }: { need: OperatorRole[]; what: str
       {local ? (
         <Button onClick={() => setOperator(local.id)}>Use {local.label}</Button>
       ) : !operator ? (
-        <Button variant="primary" icon={Wallet} onClick={connectWallet}>
+        <Button variant="primary" icon={Wallet} onClick={() => connectWallet()}>
           Connect
         </Button>
       ) : null}

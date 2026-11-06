@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Address } from "viem";
 import {
   LOCAL_OPERATORS,
@@ -10,7 +10,7 @@ import {
   type Operator,
 } from "./identities";
 import { explain } from "./errors";
-import { injectedWallet } from "./clients";
+import { injectedWallet, silentAddress, walletEvents } from "./clients";
 import { useOnShift } from "./onshift";
 import { deployment, explorerTx, isLocal } from "./config";
 import { sameAddress } from "./format";
@@ -23,7 +23,8 @@ type SessionCtx = {
   operator?: Operator;
   operatorRole: OperatorRole;
   setOperator: (id: string) => void;
-  connectWallet: () => Promise<void>;
+  connectWallet: (opts?: { prompt?: boolean }) => Promise<void>;
+  disconnectWallet: () => void;
   devices: Device[];
   device?: Device;
   setDevice: (id: string) => void;
@@ -82,6 +83,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     writeLS(OP_KEY, id);
   }, []);
 
+  const adoptWallet = useCallback((address: Address) => {
+    setWalletOperator({ id: "wallet", label: "My wallet", signer: { kind: "injected", address } });
+    setOperatorId("wallet");
+    writeLS(OP_KEY, "wallet");
+  }, []);
+
+  const disconnectWallet = useCallback(() => {
+    setWalletOperator(undefined);
+    setOperatorId("");
+    writeLS(OP_KEY, "");
+  }, []);
+
   const setDevice = useCallback((id: string) => {
     setDeviceId(id);
     writeLS(DEV_KEY, id);
@@ -97,16 +110,44 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
-  const connectWallet = useCallback(async () => {
-    try {
-      const { address } = await injectedWallet();
-      setWalletOperator({ id: "wallet", label: "My wallet", signer: { kind: "injected", address: address as Address } });
-      setOperator("wallet");
-    } catch (e) {
-      const x = explain(e);
-      notify({ tone: "error", title: x.title === "No browser wallet found" ? "No wallet found" : x.title, detail: x.detail ?? "Install MetaMask or another browser wallet." });
+  const connectWallet = useCallback(
+    async (opts?: { prompt?: boolean }) => {
+      try {
+        const { address } = await injectedWallet(opts);
+        adoptWallet(address as Address);
+      } catch (e) {
+        const x = explain(e);
+        notify({ tone: "error", title: x.title === "No browser wallet found" ? "No wallet found" : x.title, detail: x.detail ?? "Install MetaMask or another browser wallet." });
+      }
+    },
+    [adoptWallet, notify],
+  );
+
+  useEffect(() => {
+    if (isLocal) return;
+    let cancelled = false;
+    if (readLS(OP_KEY) === "wallet") {
+      silentAddress()
+        .then((address) => {
+          if (!cancelled && address) adoptWallet(address);
+        })
+        .catch(() => {});
     }
-  }, [notify, setOperator]);
+    const eth = walletEvents();
+    const onAccounts = (...args: unknown[]) => {
+      const accounts = args[0] as string[] | undefined;
+      if (!accounts?.[0]) {
+        setWalletOperator(undefined);
+        return;
+      }
+      adoptWallet(accounts[0] as Address);
+    };
+    eth?.on?.("accountsChanged", onAccounts);
+    return () => {
+      cancelled = true;
+      eth?.removeListener?.("accountsChanged", onAccounts);
+    };
+  }, [adoptWallet]);
 
   const addDevice = useCallback(
     (name: string, kind: "staff" | "agent") => {
@@ -159,6 +200,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       operatorRole,
       setOperator,
       connectWallet,
+      disconnectWallet,
       devices,
       device,
       setDevice,
@@ -171,7 +213,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       run,
       busy,
     }),
-    [operators, operator, operatorRole, setOperator, connectWallet, devices, device, setDevice, addDevice, rename, deleteDevice, toasts, notify, dismiss, run, busy],
+    [operators, operator, operatorRole, setOperator, connectWallet, disconnectWallet, devices, device, setDevice, addDevice, rename, deleteDevice, toasts, notify, dismiss, run, busy],
   );
   return <Session.Provider value={value}>{children}</Session.Provider>;
 }

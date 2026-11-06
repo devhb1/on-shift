@@ -18,7 +18,7 @@ import { useOnShift } from "./lib/onshift";
 import { useSession } from "./lib/session";
 import { deployment, isLocal, networkLabel } from "./lib/config";
 import { short } from "./lib/format";
-import { Badge, Toasts } from "./components/ui";
+import { Badge, NetworkNote, Toasts } from "./components/ui";
 import { Overview } from "./pages/Overview";
 import { Passes } from "./pages/Passes";
 import { NewPass } from "./pages/NewPass";
@@ -96,7 +96,7 @@ export function ThemeToggle() {
 }
 
 function AccountControl() {
-  const { operators, operator, operatorRole, setOperator, connectWallet } = useSession();
+  const { operators, operator, operatorRole, setOperator, connectWallet, disconnectWallet } = useSession();
   const roleBadge = operatorRole === "org" ? <Badge tone="blue">Org admin</Badge> : operatorRole === "lead" ? <Badge tone="green">Shift lead</Badge> : <Badge tone="grey">View only</Badge>;
   if (isLocal) {
     return (
@@ -114,7 +114,7 @@ function AccountControl() {
   }
   if (!operator) {
     return (
-      <button className="btn btn-primary" onClick={connectWallet}>
+      <button className="btn btn-primary" onClick={() => connectWallet()}>
         <Wallet size={15} /> Connect Wallet
       </button>
     );
@@ -125,6 +125,12 @@ function AccountControl() {
       <span className="btn mono" title={operator.signer.address}>
         {short(operator.signer.address)}
       </span>
+      <button className="btn" onClick={() => connectWallet({ prompt: true })}>
+        Switch
+      </button>
+      <button className="btn" onClick={disconnectWallet}>
+        Disconnect
+      </button>
     </div>
   );
 }
@@ -176,9 +182,13 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
       </aside>
       <main className="main">
         <div className="toolbar">
+          <span className="footnote net-status">
+            <span style={{ color: error ? "var(--red)" : "var(--green)" }}>●</span> {error ? "Network unreachable" : networkLabel}
+          </span>
           <ThemeToggle />
           <AccountControl />
         </div>
+        <NetworkNote />
         {children}
       </main>
     </div>
