@@ -1432,19 +1432,6 @@ export const incidentSwitchAbi = [
   },
   {
     "type": "function",
-    "name": "LIVE_CODEHASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "ORG",
     "inputs": [],
     "outputs": [
@@ -1524,9 +1511,28 @@ export const incidentSwitchAbi = [
   {
     "type": "function",
     "name": "approvePromote",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "codehash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "attestedCodehash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",

@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { keccak256 } from "viem";
 import { AlertOctagon, ArrowLeftRight, Clock3, KeyRound, Layers, Lock, RotateCcw, ShieldAlert, ShieldCheck, Wallet } from "lucide-react";
 import { Button, Field, Group, Row, Sheet, Tile } from "../components/ui";
 import { Gate } from "../components/Gate";
 import { useOnShift } from "../lib/onshift";
 import { useSession } from "../lib/session";
 import { send } from "../lib/tx";
+import { publicClient } from "../lib/clients";
 import { deployment, isLocal } from "../lib/config";
 import { clock, plural, short } from "../lib/format";
 import { incidentSwitchAbi } from "../generated/abis";
@@ -54,7 +56,16 @@ export function Security() {
     operator &&
     run(
       "approve",
-      () => send(operator.signer, { address: d.incidentSwitch, abi: incidentSwitchAbi, functionName: "approvePromote" }),
+      async () => {
+        const code = await publicClient.getBytecode({ address: d.shiftGate });
+        if (!code) throw new Error("Gate has no code");
+        return send(operator.signer, {
+          address: d.incidentSwitch,
+          abi: incidentSwitchAbi,
+          functionName: "approvePromote",
+          args: [keccak256(code)],
+        });
+      },
       "Codehash attested",
       "The auditor signed the live gate. Org can promote next.",
     );
@@ -96,7 +107,7 @@ export function Security() {
                 )}
                 {s.hasTillAlias && s.tillQuarantined && (
                   <>
-                    <Button icon={KeyRound} disabled={!isOrg} loading={busy === "approve"} onClick={approvePromote}>
+                    <Button icon={KeyRound} disabled={!operator} loading={busy === "approve"} onClick={approvePromote}>
                       Attest gate codehash
                     </Button>
                     <Button variant="primary" icon={RotateCcw} disabled={!isOrg} loading={busy === "promote"} onClick={promote}>
@@ -126,7 +137,7 @@ export function Security() {
           >
             <Row icon={ArrowLeftRight} tint={s.tillQuarantined ? "red" : "green"} title={`till.${d.orgName}`} subtitle={s.tillQuarantined ? "Aliased to quarantine.<org> — new pays revert" : "Live. ShiftGate.pay reads till.status from this name"} />
             <Row icon={Lock} tint="indigo" title="Refunds still hit the payer" subtitle="Already-paid orders refund as before. The cashier still cannot pick a destination." />
-            <Row icon={KeyRound} tint="orange" title="Promote is dual-key" subtitle="Org plus auditor attestation of the frozen gate extcodehash" />
+            <Row icon={KeyRound} tint="orange" title="Promote is dual-key" subtitle="The auditor names a gate codehash. Org can promote only while the live gate still matches it." />
           </Group>
         )}
 

@@ -579,14 +579,31 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(attacker);
         vm.expectRevert(IncidentSwitch.NotAuditor.selector);
-        s.incidentSwitch.approvePromote();
+        s.incidentSwitch.approvePromote(address(s.gate).codehash);
 
         vm.prank(auditor);
-        s.incidentSwitch.approvePromote();
+        s.incidentSwitch.approvePromote(address(s.gate).codehash);
         vm.prank(org);
         s.incidentSwitch.promote();
 
         assertTrue(s.gate.tillLive());
+
+        // the auditor cannot turn the till on alone, and a wrong hash never promotes
+        vm.prank(watchtower);
+        s.incidentSwitch.quarantineTill();
+        vm.prank(auditor);
+        s.incidentSwitch.approvePromote(bytes32(uint256(1)));
+        vm.prank(org);
+        vm.expectRevert(IncidentSwitch.WrongCodehash.selector);
+        s.incidentSwitch.promote();
+        vm.prank(auditor);
+        s.incidentSwitch.approvePromote(address(s.gate).codehash);
+        vm.prank(auditor);
+        vm.expectRevert(IncidentSwitch.NotOrg.selector);
+        s.incidentSwitch.promote();
+        vm.prank(org);
+        s.incidentSwitch.promote();
+
         usdc.mint(customer, 1e6);
         vm.startPrank(customer);
         usdc.approve(address(s.gate), 1e6);

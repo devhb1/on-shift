@@ -27,7 +27,8 @@ contract IncidentSwitch {
     bytes32 public immutable TILL_NODE;
     address public immutable ORG;
     address public immutable GATE;
-    bytes32 public immutable LIVE_CODEHASH;
+    /// @dev The codehash the auditor last attested. Promote requires the live gate to match it,
+    ///      so a later implementation can be adopted without redeploying this switch.
     IPermissionedRegistry public immutable EMPTY_REGISTRY;
     IVerifiableFactory public immutable FACTORY;
     address public immutable REGISTRY_IMPL;
@@ -49,6 +50,7 @@ contract IncidentSwitch {
     bool public incident;
     bool public tillQuarantined;
     bool public auditorApproved;
+    bytes32 public attestedCodehash;
     uint64 public lastChangeAt;
     uint32 public epoch;
     string public reason;
@@ -96,7 +98,6 @@ contract IncidentSwitch {
         TILL_NODE = tillNode;
         ORG = org;
         GATE = gate;
-        LIVE_CODEHASH = gate.codehash;
         EMPTY_REGISTRY = emptyRegistry;
         FACTORY = factory;
         REGISTRY_IMPL = registryImpl;
@@ -133,19 +134,20 @@ contract IncidentSwitch {
         emit TillQuarantined(msg.sender);
     }
 
-    /// @notice Auditor attests that GATE still has the codehash frozen at deploy.
-    function approvePromote() external {
+    /// @notice Auditor names the gate codehash that promote is allowed to turn back on.
+    function approvePromote(bytes32 codehash) external {
         if (msg.sender != auditor) revert NotAuditor();
-        if (GATE.codehash != LIVE_CODEHASH) revert WrongCodehash();
+        if (codehash == bytes32(0)) revert WrongCodehash();
+        attestedCodehash = codehash;
         auditorApproved = true;
-        emit PromoteApproved(msg.sender, LIVE_CODEHASH);
+        emit PromoteApproved(msg.sender, codehash);
     }
 
-    /// @notice Org restores the till. Requires a fresh auditor approval of the live codehash.
+    /// @notice Org restores the till. The live gate must still be the code the auditor named.
     function promote() external onlyOrg {
         if (!tillQuarantined) revert NotQuarantined();
         if (!auditorApproved) revert AuditorNotApproved();
-        if (GATE.codehash != LIVE_CODEHASH) revert WrongCodehash();
+        if (GATE.codehash != attestedCodehash) revert WrongCodehash();
         auditorApproved = false;
         tillQuarantined = false;
         lastChangeAt = uint64(block.timestamp);
