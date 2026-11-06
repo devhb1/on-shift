@@ -48,6 +48,8 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
     address internal agent = makeAddr("ai-agent");
     address internal customer = makeAddr("customer");
     address internal attacker = makeAddr("attacker");
+    address internal watchtower = makeAddr("watchtower");
+    address internal auditor = makeAddr("auditor");
 
     uint8 internal constant CASHIER = 0;
     uint8 internal constant SUPPORT = 1;
@@ -62,6 +64,8 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         s = _deployOnShift(org, treasury, IERC20(address(usdc)), infra, "onshift.eth");
         ops = s.ops;
         s.issuer.setLead(lead, 5, true);
+        s.incidentSwitch.setWatchtower(watchtower);
+        s.incidentSwitch.setAuditor(auditor);
         usdc.mint(address(s.gate), 500e6);
         vm.stopPrank();
         vm.deal(lead, 10 ether);
@@ -517,6 +521,74 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         vm.prank(address(s.incidentSwitch));
         vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
         s.parentResolver.setText(s.orgNode, "url", "https://phish.example");
+    }
+
+    function test_Alias_flipStopsPayKeepsPayerRefund() public {
+        _issue("shift-0412", staff, CASHIER, 4 hours, 50e6);
+        assertTrue(s.gate.tillLive());
+        assertEq(s.parentResolver.text(s.orgNode.child("till"), "till.status"), "live");
+
+        vm.prank(attacker);
+        vm.expectRevert(IncidentSwitch.NotWatchtower.selector);
+        s.incidentSwitch.quarantineTill();
+
+        vm.prank(watchtower);
+        s.incidentSwitch.quarantineTill();
+
+        assertFalse(s.gate.tillLive());
+        assertEq(s.parentResolver.text(s.orgNode.child("till"), "till.status"), "quarantine");
+        // resolver-level alias: till.<org> now serves quarantine.<org>'s records
+        assertEq(
+            keccak256(s.parentResolver.getAlias(NameHash.dnsEncode("till.onshift.eth"))),
+            keccak256(NameHash.dnsEncode("quarantine.onshift.eth"))
+        );
+
+        vm.prank(customer);
+        usdc.approve(address(s.gate), 1e6);
+        vm.prank(customer);
+        vm.expectRevert(ShiftGate.TillNotLive.selector);
+        s.gate.pay(1e6);
+
+        // already-paid orders still refund to the original payer
+        uint256 before = usdc.balanceOf(customer);
+        vm.prank(staff);
+        s.gate.refund("shift-0412", order, 10e6);
+        assertEq(usdc.balanceOf(customer), before + 10e6);
+    }
+
+    function test_Watchtower_cannotAliasToAttacker() public {
+        // watchtower has no resolver roles of its own; it can only call quarantineTill, whose
+        // target DNS is fixed at deploy. A raw setAlias from the watchtower reverts.
+        vm.prank(watchtower);
+        vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
+        s.parentResolver.setAlias(
+            NameHash.dnsEncode("till.onshift.eth"), NameHash.dnsEncode("attacker.onshift.eth")
+        );
+    }
+
+    function test_Promote_requiresAuditorAndMatchingCodehash() public {
+        vm.prank(watchtower);
+        s.incidentSwitch.quarantineTill();
+
+        vm.prank(org);
+        vm.expectRevert(IncidentSwitch.AuditorNotApproved.selector);
+        s.incidentSwitch.promote();
+
+        vm.prank(attacker);
+        vm.expectRevert(IncidentSwitch.NotAuditor.selector);
+        s.incidentSwitch.approvePromote();
+
+        vm.prank(auditor);
+        s.incidentSwitch.approvePromote();
+        vm.prank(org);
+        s.incidentSwitch.promote();
+
+        assertTrue(s.gate.tillLive());
+        usdc.mint(customer, 1e6);
+        vm.startPrank(customer);
+        usdc.approve(address(s.gate), 1e6);
+        s.gate.pay(1e6);
+        vm.stopPrank();
     }
 
     // ---------------------------------------------------------------- playground

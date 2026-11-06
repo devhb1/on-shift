@@ -62,8 +62,8 @@ abstract contract OnShiftDeployer {
                     | RegistryRoles.ROLE_UPGRADE)
                 << 128);
 
-    uint256 internal constant ORG_RESOLVER_ROLES = (ResolverRoles.RECORDS | ResolverRoles.ROLE_UPGRADE)
-        | ((ResolverRoles.RECORDS | ResolverRoles.ROLE_UPGRADE) << 128);
+    uint256 internal constant ORG_RESOLVER_ROLES = (ResolverRoles.RECORDS | ResolverRoles.ROLE_SET_ALIAS | ResolverRoles.ROLE_UPGRADE)
+        | ((ResolverRoles.RECORDS | ResolverRoles.ROLE_SET_ALIAS | ResolverRoles.ROLE_UPGRADE) << 128);
 
     function _deployLocalInfra() internal returns (Infra memory infra) {
         infra.factory = new VerifiableFactory();
@@ -132,16 +132,58 @@ abstract contract OnShiftDeployer {
         // PassIssuer: register + unregister only. Deliberately NO ROLE_RENEW (C5).
         s.ops.grantRootRoles(RegistryRoles.ROLE_REGISTRAR | RegistryRoles.ROLE_UNREGISTER, address(s.issuer));
 
-        s.gate = new ShiftGate(s.parent, usdc, s.opsNode, org);
+        bytes32 tillNode = s.orgNode.child("till");
+        bytes memory tillDns = NameHash.dnsEncode(string.concat("till.", orgName));
+        bytes memory quarantineDns = NameHash.dnsEncode(string.concat("quarantine.", orgName));
+        s.parent.register(
+            "till", org, IPermissionedRegistry(address(0)), address(s.parentResolver), 0, type(uint64).max
+        );
+        s.parent.register(
+            "quarantine",
+            org,
+            IPermissionedRegistry(address(0)),
+            address(s.parentResolver),
+            0,
+            type(uint64).max
+        );
+        s.parentResolver.setText(tillNode, OnShiftTypes.KEY_TILL_STATUS, "live");
+        s.parentResolver.setText(s.orgNode.child("quarantine"), OnShiftTypes.KEY_TILL_STATUS, "quarantine");
+
+        s.gate = new ShiftGate(s.parent, s.parentResolver, usdc, s.opsNode, tillNode, org);
 
         s.incidentSwitch = new IncidentSwitch(
-            s.parent, s.parentResolver, s.orgNode, org, s.empty, infra.factory, infra.registryImpl
+            s.parent,
+            s.parentResolver,
+            s.orgNode,
+            tillNode,
+            org,
+            address(s.gate),
+            s.empty,
+            infra.factory,
+            infra.registryImpl,
+            tillDns,
+            quarantineDns
         );
         s.parent.grantRootRoles(RegistryRoles.ROLE_SET_SUBREGISTRY, address(s.incidentSwitch));
         s.parentResolver
             .authorizeTextRoles(s.orgDnsName, OnShiftTypes.KEY_OPS_STATUS, address(s.incidentSwitch), true);
         s.parentResolver
             .authorizeTextRoles(s.orgDnsName, OnShiftTypes.KEY_OPS_INCIDENT, address(s.incidentSwitch), true);
+        s.parentResolver
+            .authorizeTextRoles(tillDns, OnShiftTypes.KEY_TILL_STATUS, address(s.incidentSwitch), true);
+        // Local resolver: grant setAlias on the till name only. Real ENSv2 impls that lack grantRoles
+        // skip this; IncidentSwitch still writes till.status, which ShiftGate.pay() reads.
+        s.parentResolver.grantRootRoles(ResolverRoles.ROLE_SET_ALIAS, org);
+        uint256 tillResource = uint256(keccak256(abi.encode(tillNode, bytes32(0))));
+        (bool granted,) = address(s.parentResolver).call(
+            abi.encodeWithSignature(
+                "grantRoles(uint256,uint256,address)",
+                tillResource,
+                ResolverRoles.ROLE_SET_ALIAS,
+                address(s.incidentSwitch)
+            )
+        );
+        granted;
         s.incidentSwitch.setPassIssuer(address(s.issuer));
     }
 }

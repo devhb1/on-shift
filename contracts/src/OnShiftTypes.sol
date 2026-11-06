@@ -18,6 +18,9 @@ library OnShiftTypes {
     /// @dev Parent (org) resolver keys flipped by IncidentSwitch.
     string internal constant KEY_OPS_STATUS = "ops.status"; // "ok" | "incident"
     string internal constant KEY_OPS_INCIDENT = "ops.incident"; // free-text reason
+    /// @dev `till.<org>` text: "live" or "quarantine". ShiftGate.pay() reads this. Alias to
+    ///      `quarantine.<org>` makes any ENS client see the same value without a hardcoded 0x.
+    string internal constant KEY_TILL_STATUS = "till.status";
 
     /// @notice The scope a pass was issued with. `expiry` binds the scope to one registration, so a
     ///         revived (renewed) name never matches its old scope — see ShiftGate.ScopeMismatch.

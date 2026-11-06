@@ -21,8 +21,10 @@ contract ShiftGate {
     using NameHash for bytes32;
 
     IPermissionedRegistry public immutable PARENT;
+    IPermissionedResolver public immutable TILL_RESOLVER;
     IERC20 public immutable USDC;
     bytes32 public immutable OPS_NODE;
+    bytes32 public immutable TILL_NODE;
     address public immutable ORG;
 
     /// @dev keccak256(registry, labelId, expiry) => spent during that one registration
@@ -72,11 +74,21 @@ contract ShiftGate {
     error InvalidAmount();
     error UnknownOrder();
     error OverRefund(uint256 refundable);
+    error TillNotLive();
 
-    constructor(IPermissionedRegistry parent, IERC20 usdc, bytes32 opsNode, address org) {
+    constructor(
+        IPermissionedRegistry parent,
+        IPermissionedResolver tillResolver,
+        IERC20 usdc,
+        bytes32 opsNode,
+        bytes32 tillNode,
+        address org
+    ) {
         PARENT = parent;
+        TILL_RESOLVER = tillResolver;
         USDC = usdc;
         OPS_NODE = opsNode;
+        TILL_NODE = tillNode;
         ORG = org;
     }
 
@@ -84,6 +96,7 @@ contract ShiftGate {
 
     /// @notice A customer pays the shop. The order id is derived on chain so nobody can claim another's.
     function pay(uint256 amount) external returns (bytes32 orderId) {
+        if (!_tillLive()) revert TillNotLive();
         if (amount == 0 || amount > type(uint128).max) revert InvalidAmount();
         orderId = keccak256(abi.encode(address(this), msg.sender, orderNonce[msg.sender]++));
         orders[orderId] = Order(msg.sender, uint128(amount), 0);
@@ -182,6 +195,15 @@ contract ShiftGate {
         p.presetId = scope.presetId;
         p.spent = spent[keccak256(abi.encode(address(opsRegistry), id, s.expiry))];
         p.shiftStatus = IPermissionedResolver(p.resolver).text(node, OnShiftTypes.KEY_STATUS);
+    }
+
+    function tillLive() external view returns (bool) {
+        return _tillLive();
+    }
+
+    function _tillLive() internal view returns (bool) {
+        return keccak256(bytes(TILL_RESOLVER.text(TILL_NODE, OnShiftTypes.KEY_TILL_STATUS)))
+            == keccak256("live");
     }
 
     function floatBalance() external view returns (uint256) {

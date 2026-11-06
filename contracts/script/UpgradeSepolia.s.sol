@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Script, console2} from "forge-std/Script.sol";
 import {IERC20} from "../src/interfaces/IERC20.sol";
 import {IPermissionedRegistry} from "../src/interfaces/IPermissionedRegistry.sol";
+import {IPermissionedResolver} from "../src/interfaces/IPermissionedResolver.sol";
 import {PassIssuer} from "../src/PassIssuer.sol";
 import {ShiftGate} from "../src/ShiftGate.sol";
 import {Playground} from "../src/Playground.sol";
@@ -25,8 +26,12 @@ contract UpgradeSepolia is Script, DeploymentWriter {
         uint256 startBlock = block.number;
         ShiftGate gate = new ShiftGate(
             IPermissionedRegistry(vm.parseJsonAddress(json, ".parentRegistry")),
+            IPermissionedResolver(vm.parseJsonAddress(json, ".parentResolver")),
             IERC20(vm.parseJsonAddress(json, ".usdc")),
             vm.parseJsonBytes32(json, ".opsNode"),
+            keccak256(
+                abi.encodePacked(vm.parseJsonBytes32(json, ".orgNode"), keccak256("till"))
+            ),
             issuer.ORG()
         );
         uint256 float = oldGate.floatBalance();
