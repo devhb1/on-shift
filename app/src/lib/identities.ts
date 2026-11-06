@@ -5,18 +5,21 @@ import { CHAIN_ID, isLocal } from "./config";
 /** Who signs a transaction: a key held in this browser, or the user's own browser wallet. */
 export type Signer = { kind: "key"; address: Address; privateKey: Hex } | { kind: "injected"; address: Address };
 
-/** A console operator (org multisig or shift lead). */
+/** A console operator (organisation wallet or shift lead). */
 export type Operator = { id: string; label: string; signer: Signer };
 
 /** A staff phone or AI agent: a burner key that never leaves this browser. */
 export type Device = { id: string; name: string; kind: "staff" | "agent"; signer: Extract<Signer, { kind: "key" }> };
 
-// Anvil's PUBLIC development keys (well-known test mnemonic). Only ever used on the local chain.
-const DEV = {
-  org: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-  lead: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
-  agent: "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
-} as const satisfies Record<string, Hex>;
+/** Anvil's public development keys. Present only in `vite` dev, never in the hosted bundle. */
+function anvilKeys(): { org: Hex; lead: Hex; agent: Hex } | undefined {
+  if (!import.meta.env.DEV) return undefined;
+  return {
+    org: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+    lead: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+    agent: "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
+  };
+}
 
 const keySigner = (privateKey: Hex): Extract<Signer, { kind: "key" }> => ({
   kind: "key",
@@ -24,12 +27,15 @@ const keySigner = (privateKey: Hex): Extract<Signer, { kind: "key" }> => ({
   address: privateKeyToAccount(privateKey).address,
 });
 
-export const LOCAL_OPERATORS: Operator[] = isLocal
-  ? [
-      { id: "org", label: "Org admin", signer: keySigner(DEV.org) },
-      { id: "lead", label: "Shift lead", signer: keySigner(DEV.lead) },
-    ]
-  : [];
+const ANVIL = anvilKeys();
+
+export const LOCAL_OPERATORS: Operator[] =
+  ANVIL && isLocal
+    ? [
+        { id: "org", label: "Org admin", signer: keySigner(ANVIL.org) },
+        { id: "lead", label: "Shift lead", signer: keySigner(ANVIL.lead) },
+      ]
+    : [];
 
 export const CUSTOMER_ADDRESS: Address = "0x90F79bf6EB2c4f870365E785982E1f101E93b906";
 export const ATTACKER_ADDRESS: Address = "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65";
@@ -57,7 +63,7 @@ function write(list: Stored[]) {
 export function loadDevices(): Device[] {
   const stored = read().map((d) => ({ id: d.id, name: d.name, kind: d.kind, signer: keySigner(d.privateKey) }));
   // On the local chain the demo agent wallet (also used by `npm run agent`) is always available.
-  if (isLocal) stored.unshift({ id: "agent", name: "Refund bot", kind: "agent", signer: keySigner(DEV.agent) });
+  if (ANVIL && isLocal) stored.unshift({ id: "agent", name: "Refund bot", kind: "agent", signer: keySigner(ANVIL.agent) });
   return stored;
 }
 

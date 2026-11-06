@@ -47,6 +47,11 @@ execSync(`forge script script/Deploy.s.sol --rpc-url ${RPC} --broadcast --privat
 execSync("node scripts/export-abis.mjs", { cwd: root, stdio: "inherit" });
 
 console.log("> Starting the web app on http://localhost:5173");
-const vite = spawn("npm", ["--workspace", "app", "run", "dev"], { cwd: root, stdio: "inherit" });
+// VITE_CHAIN_ID stays on the developer harness. A normal `vite` or Vercel build reads Sepolia.
+const vite = spawn("npm", ["--workspace", "app", "run", "dev"], {
+  cwd: root,
+  stdio: "inherit",
+  env: { ...process.env, VITE_CHAIN_ID: "31337" },
+});
 children.push(vite);
 vite.on("exit", stop);

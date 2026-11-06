@@ -28,22 +28,25 @@ export type Deployment = {
 };
 
 const all = deployments as Record<string, Deployment>;
-export const availableNetworks = Object.values(all).sort((a, b) => (a.network === "sepolia" ? -1 : b.network === "sepolia" ? 1 : 0));
+/** The Anvil chain is a developer harness. The product only follows it when VITE_CHAIN_ID forces it. */
+const allowLocal = import.meta.env.VITE_CHAIN_ID === "31337";
+export const availableNetworks = Object.values(all)
+  .filter((n) => allowLocal || n.network !== "local")
+  .sort((a, b) => (a.network === "sepolia" ? -1 : b.network === "sepolia" ? 1 : 0));
 
-const NETWORK_KEY = "onshift.network.v1";
+const NETWORK_KEY = "onshift.network.v2";
 
 function pickChainId(): number {
   const forced = import.meta.env.VITE_CHAIN_ID;
-  if (forced) return Number(forced);
+  if (forced && all[String(Number(forced))]) return Number(forced);
   try {
     const saved = localStorage.getItem(NETWORK_KEY);
-    if (saved && all[saved]) return Number(saved);
+    const savedDeployment = saved ? all[saved] : undefined;
+    if (savedDeployment && savedDeployment.network !== "local") return savedDeployment.chainId;
   } catch {
     /* ignore */
   }
-  // Running locally: prefer the local chain when it is deployed; otherwise the public testnet.
-  if (all["31337"] && ["localhost", "127.0.0.1"].includes(window.location.hostname)) return 31337;
-  return availableNetworks[0]?.chainId ?? 31337;
+  return availableNetworks.find((n) => n.network !== "local")?.chainId ?? availableNetworks[0]?.chainId ?? sepolia.id;
 }
 
 export const CHAIN_ID = pickChainId();
@@ -60,14 +63,31 @@ export function switchNetwork(chainId: number) {
   window.location.reload();
 }
 
-export const RPC_URLS: string[] = import.meta.env.VITE_RPC_URL
-  ? [import.meta.env.VITE_RPC_URL]
-  : isLocal
-    ? ["http://127.0.0.1:8545"]
-    : ["https://ethereum-sepolia-rpc.publicnode.com", "https://rpc.sepolia.ethpandaops.io"];
+const PUBLIC_SEPOLIA = [
+  "https://ethereum-sepolia-rpc.publicnode.com",
+  "https://rpc.sepolia.org",
+  "https://rpc.sepolia.ethpandaops.io",
+  "https://1rpc.io/sepolia",
+];
+
+/** A configured RPC is tried first. Public endpoints stay behind it so one rate limit doesn't blank the app. */
+export const RPC_URLS: string[] = isLocal
+  ? [import.meta.env.VITE_RPC_URL || "http://127.0.0.1:8545"]
+  : import.meta.env.VITE_RPC_URL
+    ? [import.meta.env.VITE_RPC_URL, ...PUBLIC_SEPOLIA.filter((url) => url !== import.meta.env.VITE_RPC_URL)]
+    : PUBLIC_SEPOLIA;
+
+/** Anvil deploys this Multicall3 address. viem's Foundry chain does not list it, so batched reads were rejected. */
+const LOCAL_MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
 
 export const chain = isLocal
-  ? foundry
+  ? defineChain({
+      ...foundry,
+      contracts: {
+        ...foundry.contracts,
+        multicall3: { address: LOCAL_MULTICALL3 },
+      },
+    })
   : CHAIN_ID === sepolia.id
     ? sepolia
     : defineChain({
