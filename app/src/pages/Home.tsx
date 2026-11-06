@@ -6,7 +6,7 @@ import { deployment, explorerAddress, networkLabel } from "../lib/config";
 import { usdc } from "../lib/format";
 import { ThemeToggle, navigate, type Route } from "../App";
 
-const REPO = "https://github.com/devhb1/onshift";
+const REPO = "https://github.com/devhb1/on-shift";
 
 const DOORS: { route: Route; icon: typeof Clock3; title: string; body: string; cta: string }[] = [
   { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Paste a name. If they DMed you as support, this is the check. No account.", cta: "Open Public Check" },

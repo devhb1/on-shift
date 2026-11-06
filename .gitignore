@@ -19,8 +19,11 @@ app/src/generated/deployments.json
 # TypeScript incremental build cache
 *.tsbuildinfo
 
-# Product docs stay on disk only
-docs/
+# Product docs stay on disk only (except the judge note + screenshots)
+docs/*
+!docs/ETHGLOBAL.md
+!docs/screenshots/
+!docs/screenshots/**
 
 # Local review / improvement notes
 z-new-improve/

@@ -8,9 +8,10 @@
 
 `shift-0412.ops.onshift.eth` proves to any wallet or contract that its holder acts for **onshift.eth** *right now*, lets them touch only what you allow, can never be transferred, and stops working by itself when the shift ends. Refunds are bound to the paying wallet. Nobody has to remember to revoke it.
 
-![Tests](https://img.shields.io/badge/tests-41%20local%20%2B%20fork%20suite-34c759)
+![Tests](https://img.shields.io/badge/tests-88%20passing-34c759)
 ![Sepolia](https://img.shields.io/badge/live-Sepolia%20ENSv2-0071e3)
 ![ENS](https://img.shields.io/badge/onshift.eth-registered-5856d6)
+![Tag](https://img.shields.io/badge/tag-v1.0--ethglobal-5856d6)
 ![License](https://img.shields.io/badge/license-MIT-8e8e93)
 
 <img src="docs/screenshots/dashboard.jpg" alt="OnShift console" width="880" />
@@ -53,16 +54,19 @@ OnShift runs on the **real ENSv2 contracts** from [`ensdomains/contracts-v2`](ht
 | | Address |
 |---|---|
 | `onshift.eth` | [ENS app](https://sepolia.app.ens.domains/onshift.eth) · registered via ETHRegistrar ([tx](https://sepolia.etherscan.io/tx/0x657f254454ac2bfb360093ae2768597ff32c949579dbb09c0f1766c3d5a1fd34)) |
-| PassIssuer | [`0x52Cb54327539594428C0B564Ff3755A2F6A35BB2`](https://sepolia.etherscan.io/address/0x52Cb54327539594428C0B564Ff3755A2F6A35BB2) |
-| ShiftGate | [`0x199C363D7081A05a55c4c507A5Ffb45dC1Da3052`](https://sepolia.etherscan.io/address/0x199C363D7081A05a55c4c507A5Ffb45dC1Da3052) |
-| Playground | [`0xee3F81Fa7f5dE99546f4066bc6ffE6a5586DD2CE`](https://sepolia.etherscan.io/address/0xee3F81Fa7f5dE99546f4066bc6ffE6a5586DD2CE) |
-| IncidentSwitch | [`0x4ACC1bBBBAF446Ae027D907C0a50636ada3C0ba0`](https://sepolia.etherscan.io/address/0x4ACC1bBBBAF446Ae027D907C0a50636ada3C0ba0) |
-| Previous ShiftGate | [`0xA7e16d8f43dF36017b821e9B54eDCbBf891d8516`](https://sepolia.etherscan.io/address/0xA7e16d8f43dF36017b821e9B54eDCbBf891d8516) |
-| PassResolverLib | [`0x188e1Bf065D64390c38Cab4D14d0A767F120d5FD`](https://sepolia.etherscan.io/address/0x188e1Bf065D64390c38Cab4D14d0A767F120d5FD) |
+| PassIssuer | [`0x65f897A11B4fc95fA3305DA2e3C47E5CA5CdC10f`](https://sepolia.etherscan.io/address/0x65f897A11B4fc95fA3305DA2e3C47E5CA5CdC10f) |
+| ShiftGate (ops / production) | [`0x785F62e06b4b7C5a2160435e62b89dedC36Fd04f`](https://sepolia.etherscan.io/address/0x785F62e06b4b7C5a2160435e62b89dedC36Fd04f) |
+| SandboxGate (demo) | [`0x3dc452496c1c8Cd72E620d490b306B14935eFf4C`](https://sepolia.etherscan.io/address/0x3dc452496c1c8Cd72E620d490b306B14935eFf4C) |
+| Playground (demo faucet) | [`0xFc1Bb8fb4f6F8Da9A6d193F9C869687e5bF56955`](https://sepolia.etherscan.io/address/0xFc1Bb8fb4f6F8Da9A6d193F9C869687e5bF56955) |
+| IncidentSwitch | [`0xD077e008F758eC4a693734B1Eb76Dff55a04B2BB`](https://sepolia.etherscan.io/address/0xD077e008F758eC4a693734B1Eb76Dff55a04B2BB) |
+| PassResolverLib | [`0x73c5D324c2BF041B0b1dB48de18bdAfEafe50D90`](https://sepolia.etherscan.io/address/0x73c5D324c2BF041B0b1dB48de18bdAfEafe50D90) |
 | onshift.eth registry (UserRegistry proxy) | [`0x0206b730986F9CBc171a7AAfCB72Ab242d6E4229`](https://sepolia.etherscan.io/address/0x0206b730986F9CBc171a7AAfCB72Ab242d6E4229) |
 | onshift.eth resolver (PermissionedResolver proxy) | [`0xF5f08043362E7Fa5c12134e98fd18f9A1Ca2a307`](https://sepolia.etherscan.io/address/0xF5f08043362E7Fa5c12134e98fd18f9A1Ca2a307) |
-| ops.onshift.eth registry (UserRegistry proxy) | [`0xC18b78706f3dD59996DDAeD1314fe77B66AE2610`](https://sepolia.etherscan.io/address/0xC18b78706f3dD59996DDAeD1314fe77B66AE2610) |
+| ops.onshift.eth registry | [`0xC18b78706f3dD59996DDAeD1314fe77B66AE2610`](https://sepolia.etherscan.io/address/0xC18b78706f3dD59996DDAeD1314fe77B66AE2610) |
+| demo.onshift.eth registry | [`0x60eEcD1EF3395F72Fc3Ae7801d55Ad2fA4d60143`](https://sepolia.etherscan.io/address/0x60eEcD1EF3395F72Fc3Ae7801d55Ad2fA4d60143) |
 | ENSv2 VerifiableFactory · UserRegistry impl · PermissionedResolver impl | `0x118B…B70F` · `0x840F…61C0` · `0x7E4B…2303` |
+
+Tagged release: **`v1.0-ethglobal`**. Playground passes mint only under `*.demo.onshift.eth` with roles `Demo cashier` / `Demo agent`, empty agent-context, and a separate float — they cannot impersonate ops staff or refund production orders.
 
 Full list: [`contracts/deployments/11155111.json`](contracts/deployments/11155111.json).
 
@@ -87,9 +91,10 @@ OnShift live check on Sepolia ENSv2 — shift-2524.ops.onshift.eth
    ✓ refund to an order nobody paid: blocked with UnknownOrder
    ✓ refund more than the order: blocked with OverRefund
    ✓ refund over the cap: blocked with OverCap
-4b. Anyone can try it: a Playground pass for another burner
-   ✓ playground pass issued
+4b. Anyone can try it: a sandbox Playground pass under demo.<org>
+   ✓ playground demo pass issued
    ✓ playground cap above $5: blocked with CapTooHigh
+   ✓ sandboxGate present for demo float/orders
 5. Nobody sends a transaction. Waiting for the shift to end…
    ✓ refund after the shift: blocked with PassNotLive
    ✓ gate says NOT ON SHIFT
@@ -104,15 +109,17 @@ All checks passed on Sepolia ENSv2.
 flowchart LR
     subgraph ENS["ENSv2 on Sepolia"]
       ETH[".eth registry"] -->|onshift| P["onshift.eth UserRegistry<br/>(org multisig)"]
-      P -->|"ops → subregistry (live pointer)"| OPS["ops UserRegistry"]
+      P -->|"ops → live pointer"| OPS["ops UserRegistry"]
+      P -->|"demo → sandbox"| DEMO["demo UserRegistry"]
       OPS --> S1["shift-0412<br/>owner = staff burner<br/>roleBitmap = 0 · expires 4h"]
-      OPS --> S2["agent-7<br/>owner = agent wallet<br/>roleBitmap = 0 · expires 1h"]
+      DEMO --> P1["play-… · Demo cashier · separate float"]
       S1 -.resolver.-> R1["PermissionedResolver #1<br/>serves ONLY shift-0412"]
-      S2 -.resolver.-> R2["PermissionedResolver #2<br/>serves ONLY agent-7"]
     end
     ISS["PassIssuer"] -->|register / unregister| OPS
+    PG["Playground"] -->|issueDemo| DEMO
     ISS -->|"VerifiableFactory proxy + records"| R1
     GATE["ShiftGate<br/>refund ≤ limit · check-in"] -->|"getSubregistry('ops') · getState(labelhash)"| OPS
+    SG["SandboxGate"] -->|"getSubregistry('demo')"| DEMO
     GATE -->|"data(pass.scope)"| R1
     SW["IncidentSwitch"] -->|setSubregistry| P
     V["Public check · wallets · UniversalResolverV2"] --> ENS
@@ -149,7 +156,7 @@ Every gated action re-derives authority from ENS, on every call:
 | C7 | Token IDs are mutable. | Everything is keyed by labelhash; spend is tracked per `(registry, labelhash, expiry)`. | `test_Reissue_newTokenIdAndFreshSpend` |
 | C8 | Text roles granted at the root cover every name and key. | `IncidentSwitch` gets `authorizeTextRoles` for two records of the org name only. | `test_IncidentSwitch_holdsOnlyKeyScopedTextRights` |
 
-**The same 25 tests run twice:** against the local ABI-compatible layer, and against the **real ENSv2 contracts on a Sepolia fork** (`test/SepoliaFork.t.sol`).
+**88 tests** locally (`npm test`), including inverted audit regressions in `AuditFindings.t.sol`. The same suite also runs against the **real ENSv2 contracts on a Sepolia fork** (`test/SepoliaFork.t.sol`).
 
 ### Found while deploying: Sepolia's code-deposit cost
 
@@ -199,8 +206,9 @@ Open **http://localhost:5173**. Overview, passes, activity, and Public Check are
 | Command | What it does |
 |---|---|
 | `npm run dev` | Local chain + deploy + app |
-| `npm test` | 25 Foundry tests on the local ENSv2 layer, including a fuzz test |
-| `npm run test:fork` | The same 25 tests against the real ENSv2 contracts on a Sepolia fork |
+| `npm test` | 88 Foundry tests on the local ENSv2 layer (incl. fuzz + audit regressions) |
+| `npm run test:sdk` | SDK `passStatus` ABI round-trip |
+| `npm run test:fork` | The same suite against the real ENSv2 contracts on a Sepolia fork |
 | `npm run agent` | An AI agent gets a $20 pass and refunds until `OverCap` (local) |
 | `npm run deploy:sepolia` | Deploy OnShift on Sepolia ENSv2 |
 | `npm run register:sepolia` | Register `<org>.eth` via the ENSv2 ETHRegistrar (commit → wait → register) |
