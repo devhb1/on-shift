@@ -3,6 +3,14 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  // viem + the ABIs make one ~650 kB chunk; fine for a single-page dapp.
-  build: { chunkSizeWarningLimit: 800 },
+  build: {
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          viem: ["viem", "viem/accounts", "viem/chains"],
+        },
+      },
+    },
+  },
 });

@@ -46,13 +46,13 @@ export function Home() {
         </div>
       </header>
 
-      <section className="hero">
-        <h1 className="hero-title">Keys that clock out.</h1>
-        <p className="hero-sub">
+      <section className="landing-hero">
+        <h1 className="landing-title">Keys that clock out.</h1>
+        <p className="landing-sub">
           Give staff and AI agents an ENS name for one shift, not a key forever. Every pass is time-boxed, budget-capped and checkable by anyone.
         </p>
         <form
-          className="hero-check"
+          className="landing-check"
           onSubmit={(e) => {
             e.preventDefault();
             check(name.trim());
@@ -64,7 +64,7 @@ export function Home() {
           </Button>
         </form>
         {example && (
-          <button className="hero-live" onClick={() => check(example.name)}>
+          <button className="landing-live" onClick={() => check(example.name)}>
             <span className="dot-live" /> {example.name} is on shift for <Countdown expiry={example.expiry} />
           </button>
         )}

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Globe, Server } from "lucide-react";
 import { Group, KV, Row, Segmented } from "../components/ui";
 import { useOnShift } from "../lib/onshift";
@@ -45,7 +46,9 @@ export function DeploymentPage() {
             rows={[
               ["PassIssuer", <Addr a={d.passIssuer} />],
               ["ShiftGate", <Addr a={d.shiftGate} />],
+              ...(d.playground ? ([["Playground", <Addr a={d.playground} />]] as [string, ReactNode][]) : []),
               ["IncidentSwitch", <Addr a={d.incidentSwitch} />],
+              ...(d.legacyShiftGate ? ([["Previous ShiftGate", <Addr a={d.legacyShiftGate} />]] as [string, ReactNode][]) : []),
             ]}
           />
         </Group>

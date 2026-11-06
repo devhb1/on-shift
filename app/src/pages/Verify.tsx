@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { keccak256, toBytes, type Address } from "viem";
-import { AlertTriangle, BadgeCheck, Check, Clock3, Link2, Search, ShieldAlert, X } from "lucide-react";
-import { Button, Countdown, Group, KV, NetworkNote, Tile } from "../components/ui";
+import { normalize } from "viem/ens";
+import { AlertTriangle, BadgeCheck, Check, Clock3, Link2, ScanLine, Search, ShieldAlert, X } from "lucide-react";
+import { Button, Countdown, Group, KV, NetworkNote, Sheet, Tile } from "../components/ui";
 import { publicClient } from "../lib/clients";
-import { passNode } from "../lib/onshift";
-import { deployment, isLocal, networkLabel, VERIFIED_ORGS } from "../lib/config";
+import { labelId, passNode } from "../lib/onshift";
+import { deployment, explorerAddress, isLocal, networkLabel, UNIVERSAL_RESOLVER, VERIFIED_ORGS } from "../lib/config";
 import { clock, levenshtein, short, usdc } from "../lib/format";
-import { passIssuerAbi, permissionedResolverAbi, shiftGateAbi } from "../generated/abis";
+import { passIssuerAbi, permissionedRegistryAbi, permissionedResolverAbi, shiftGateAbi } from "../generated/abis";
 import { ThemeToggle, navigate } from "../App";
 
 type Result =
@@ -27,13 +28,71 @@ type Result =
       cap: bigint;
       spent: bigint;
       block: bigint;
+      proof: Proof;
     };
+
+/** What an independent ENS client sees: the registry entry and records via the Universal Resolver. */
+type Proof = {
+  registry: Address;
+  registryStatus: string;
+  tokenId: bigint;
+  resolver?: Address;
+  universal: { key: string; value: string | null }[];
+  resolves: boolean;
+};
+
+const STATUS_NAMES = ["Available", "Reserved", "Registered"];
+const PROOF_KEYS = ["org", "role", "shift.status"];
+
+async function readProof(name: string, label: string): Promise<Proof> {
+  const d = deployment!;
+  const registry = (await publicClient.readContract({ address: d.parentRegistry, abi: permissionedRegistryAbi, functionName: "getSubregistry", args: ["ops"] })) as Address;
+  const [state, resolver] = await Promise.all([
+    publicClient.readContract({ address: registry, abi: permissionedRegistryAbi, functionName: "getState", args: [labelId(label)] }),
+    publicClient.readContract({ address: registry, abi: permissionedRegistryAbi, functionName: "getResolver", args: [label] }),
+  ]);
+  const universal = UNIVERSAL_RESOLVER
+    ? await Promise.all(
+        PROOF_KEYS.map(async (key) => {
+          try {
+            return { key, value: await publicClient.getEnsText({ name: normalize(name), key, universalResolverAddress: UNIVERSAL_RESOLVER }) };
+          } catch {
+            return { key, value: null };
+          }
+        }),
+      )
+    : [];
+  return {
+    registry,
+    registryStatus: STATUS_NAMES[Number(state.status)] ?? String(state.status),
+    tokenId: state.tokenId,
+    resolver: resolver === "0x0000000000000000000000000000000000000000" ? undefined : (resolver as Address),
+    universal,
+    resolves: universal.some((r) => !!r.value),
+  };
+}
+
+const BarcodeDetectorCtor = (globalThis as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
+
+/** A scanned pass QR is the verify URL; plain names work too. */
+function nameFromScan(raw: string) {
+  try {
+    const hash = new URL(raw).hash;
+    const q = hash.split("?")[1];
+    const name = q ? new URLSearchParams(q).get("name") : null;
+    if (name) return name;
+  } catch {
+    /* not a URL */
+  }
+  return raw.trim();
+}
 
 export function Verify({ initialName }: { initialName: string }) {
   const d = deployment!;
   const [input, setInput] = useState(initialName);
   const [result, setResult] = useState<Result>();
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   const check = useCallback(
     async (raw: string, quiet = false) => {
@@ -54,11 +113,13 @@ export function Verify({ initialName }: { initialName: string }) {
           setResult({ kind: "invalid", name });
           return;
         }
-        const [status, indexPlusOne, opsStatus, block] = await Promise.all([
+        const fullName = `${label}${suffix}`;
+        const [status, indexPlusOne, opsStatus, block, proof] = await Promise.all([
           publicClient.readContract({ address: d.shiftGate, abi: shiftGateAbi, functionName: "passStatus", args: [label] }),
           publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "latestPassIndexPlusOne", args: [keccak256(toBytes(label))] }),
           publicClient.readContract({ address: d.parentResolver, abi: permissionedResolverAbi, functionName: "text", args: [d.orgNode, "ops.status"] }),
           publicClient.getBlockNumber(),
+          readProof(fullName, label),
         ]);
         const found = indexPlusOne > 0n;
         const pass = found
@@ -86,6 +147,7 @@ export function Verify({ initialName }: { initialName: string }) {
           cap: status.cap,
           spent: status.spent,
           block,
+          proof,
         });
       } catch {
         setResult(undefined);
@@ -121,7 +183,8 @@ export function Verify({ initialName }: { initialName: string }) {
         </a>
         <div className="row">
           <ThemeToggle />
-          <a href="#/overview">For organizations</a>
+          <a href="#/home">Home</a>
+          <a href="#/overview">Console</a>
         </div>
       </nav>
       <NetworkNote compact />
@@ -152,8 +215,25 @@ export function Verify({ initialName }: { initialName: string }) {
           <Button variant="primary" size="lg" loading={loading} type="submit">
             Check
           </Button>
+          {BarcodeDetectorCtor && (
+            <Button size="lg" type="button" icon={ScanLine} onClick={() => setScanning(true)} aria-label="Scan a pass QR code">
+              Scan
+            </Button>
+          )}
         </form>
       </section>
+      {scanning && (
+        <Scanner
+          onClose={() => setScanning(false)}
+          onFound={(raw) => {
+            setScanning(false);
+            const name = nameFromScan(raw);
+            setInput(name);
+            navigate("verify", { name });
+            check(name);
+          }}
+        />
+      )}
 
       <section className="result">{result && <Verdict result={result} />}</section>
 
@@ -257,6 +337,83 @@ function Verdict({ result }: { result: Result }) {
         Checked on {networkLabel} at block {result.block.toString()}
         {result.holder ? ` · holder ${short(result.holder)}` : ""}
       </p>
+      {result.issued && <ProofPanel proof={result.proof} />}
     </div>
+  );
+}
+
+function ProofPanel({ proof }: { proof: Proof }) {
+  const link = (a: Address) => (
+    <a href={explorerAddress(a)} target="_blank" rel="noreferrer" className="mono">
+      {short(a)}
+    </a>
+  );
+  return (
+    <details className="proof-panel">
+      <summary>Show proof</summary>
+      <p className="small secondary" style={{ margin: "8px 0 12px" }}>
+        {UNIVERSAL_RESOLVER ? (
+          <>
+            Read through the ENS Universal Resolver ({short(UNIVERSAL_RESOLVER)}), the same entry point wallets and explorers use. {proof.resolves ? "The name resolves." : "The name no longer resolves: its registry entry has no resolver, so there is nothing to fall back to."}
+          </>
+        ) : (
+          "Read from the registry and the pass resolver."
+        )}
+      </p>
+      <KV
+        rows={[
+          ["Registry (live ops pointer)", link(proof.registry)],
+          ["Registry state", proof.registryStatus],
+          ["Token ID", <span className="mono">{proof.tokenId.toString().slice(0, 12)}…</span>],
+          ["Pass resolver", proof.resolver ? link(proof.resolver) : "none"],
+          ...proof.universal.map((r) => [<span className="mono">{r.key}</span>, r.value ? r.value : <span className="secondary">not set</span>] as [ReactNode, ReactNode]),
+        ]}
+      />
+    </details>
+  );
+}
+
+function Scanner({ onFound, onClose }: { onFound: (raw: string) => void; onClose: () => void }) {
+  const [error, setError] = useState<string>();
+  const video = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    let stream: MediaStream | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+    const detector = BarcodeDetectorCtor ? new BarcodeDetectorCtor({ formats: ["qr_code"] }) : undefined;
+    const tick = async () => {
+      if (stopped || !detector || !video.current) return;
+      try {
+        const [code] = await detector.detect(video.current);
+        if (code?.rawValue) return onFound(code.rawValue);
+      } catch {
+        /* frame not ready */
+      }
+      timer = setTimeout(tick, 300);
+    };
+    navigator.mediaDevices
+      ?.getUserMedia({ video: { facingMode: "environment" } })
+      .then((s) => {
+        stream = s;
+        if (!video.current) return;
+        video.current.srcObject = s;
+        video.current.play().then(tick, tick);
+      })
+      .catch(() => setError("Camera not available. Type the name instead."));
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [onFound]);
+  return (
+    <Sheet onClose={onClose}>
+      <div className="sheet-title">Scan a pass</div>
+      <p className="secondary small" style={{ margin: "6px 0 14px" }}>Point the camera at the QR code on the staff app.</p>
+      {error ? <p className="small">{error}</p> : <video ref={video} className="scanner" muted playsInline />}
+      <Button block onClick={onClose} style={{ marginTop: 14 }}>
+        Cancel
+      </Button>
+    </Sheet>
   );
 }

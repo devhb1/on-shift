@@ -1524,35 +1524,35 @@ textarea.input {
   justify-content: space-between;
   padding: 18px 0;
 }
-.hero {
+.landing-hero {
   text-align: center;
   padding: 56px 0 40px;
 }
-.hero-title {
+.landing-title {
   font-size: 56px;
   line-height: 1.05;
   letter-spacing: -0.035em;
   font-weight: 700;
   margin: 0;
 }
-.hero-sub {
+.landing-sub {
   font-size: 19px;
   line-height: 1.45;
   color: var(--secondary);
   max-width: 620px;
   margin: 16px auto 28px;
 }
-.hero-check {
+.landing-check {
   display: flex;
   gap: 10px;
   max-width: 620px;
   margin: 0 auto;
 }
-.hero-check .input {
+.landing-check .input {
   flex: 1;
   min-width: 0;
 }
-.hero-live {
+.landing-live {
   margin-top: 14px;
   background: none;
   border: 0;
@@ -1561,7 +1561,7 @@ textarea.input {
   font-size: 14px;
   cursor: pointer;
 }
-.hero-live:hover {
+.landing-live:hover {
   color: var(--label);
 }
 .dot-live {
@@ -1675,16 +1675,16 @@ textarea.input {
   color: var(--blue);
 }
 @media (max-width: 760px) {
-  .hero {
+  .landing-hero {
     padding-top: 28px;
   }
-  .hero-title {
+  .landing-title {
     font-size: 38px;
   }
-  .hero-check {
+  .landing-check {
     flex-direction: column;
   }
-  .hero-check .input {
+  .landing-check .input {
     flex: none;
   }
   .doors,
@@ -1694,4 +1694,25 @@ textarea.input {
   .proof-stats {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+.proof-panel {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+.proof-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+.proof-panel a {
+  color: var(--blue);
+}
+.scanner {
+  width: 100%;
+  border-radius: var(--radius);
+  background: #000;
+  aspect-ratio: 1;
+  object-fit: cover;
 }
