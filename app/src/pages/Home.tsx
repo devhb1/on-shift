@@ -1,44 +1,73 @@
-import { useState } from "react";
-import { ArrowRight, BadgeCheck, Bot, Clock3, CreditCard, FlaskConical, LayoutGrid, ShieldCheck, Smartphone, TimerOff } from "lucide-react";
-import { Button, Countdown, NetworkNote, Tile } from "../components/ui";
+import { useEffect, useState } from "react";
+import { ArrowRight, BadgeCheck, FlaskConical, LayoutGrid, Smartphone } from "lucide-react";
+import { Button, Countdown, NetworkNote } from "../components/ui";
 import { useOnShift } from "../lib/onshift";
-import { deployment, explorerAddress, networkLabel } from "../lib/config";
-import { usdc } from "../lib/format";
+import { deployment, networkLabel } from "../lib/config";
 import { ThemeToggle, navigate, type Route } from "../App";
 
 const REPO = "https://github.com/devhb1/on-shift";
 
-const DOORS: { route: Route; icon: typeof Clock3; title: string; body: string; cta: string }[] = [
-  { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Paste a name. If they DMed you as support, this is the check. No account.", cta: "Open Public Check" },
-  { route: "try", icon: FlaskConical, title: "Issue a pass", body: "Any wallet can mint a real ENSv2 name on this deployment. An hour, $5, then it dies.", cta: "Open Playground" },
-  { route: "device", icon: Smartphone, title: "I'm on shift", body: "Refunds only go back to the wallet that paid. You cannot pick a recipient.", cta: "Open Staff App" },
+const ATTACKS: { try: string; result: string; who: string; ok?: boolean }[] = [
+  { try: "Send the refund to their own wallet", result: "EACUnauthorizedAccountRoles", who: "Permissioned Resolver" },
+  { try: "Raise their own cap", result: "EACUnauthorizedAccountRoles", who: "Issuer-only scope" },
+  { try: "Transfer or sell the pass", result: "TransferDisallowed", who: "roleBitmap = 0" },
+  { try: "Refund an order nobody paid", result: "UnknownOrder", who: "ShiftGate" },
+  { try: "Refund more than the cap", result: "OverCap", who: "ShiftGate" },
+  { try: "Use it after the shift", result: "PassNotLive", who: "ENSv2 expiry" },
+  { try: "Refund the real customer, within cap", result: "allowed", who: "The only thing a pass can do", ok: true },
 ];
 
-const STEPS: { icon: typeof Clock3; title: string; body: string }[] = [
-  { icon: BadgeCheck, title: "Check", body: "A stranger resolves the name through ENS. On shift or not, with no app login and no trust in this website." },
-  { icon: ShieldCheck, title: "Pay and refund", body: "The till only sends money back to the wallet that paid that order. A stolen phone cannot redirect it." },
-  { icon: TimerOff, title: "Clock out", body: "The name expires by itself. Break-glass aliases the till to quarantine and re-points ops, so every human and agent fails the same check." },
+const DOORS: { route: Route; icon: typeof BadgeCheck; title: string; body: string; cta: string }[] = [
+  { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Paste a name. If they DMed you as support, this is the check.", cta: "Public Check" },
+  { route: "try", icon: FlaskConical, title: "Try a demo pass", body: "Mint under demo.onshift.eth — never real staff, never the production till.", cta: "Playground" },
+  { route: "device", icon: Smartphone, title: "I'm on shift", body: "Refunds only go back to the wallet that paid.", cta: "Staff App" },
 ];
+
+function formatLeft(secs: number) {
+  const h = String(Math.floor(secs / 3600)).padStart(2, "0");
+  const m = String(Math.floor((secs % 3600) / 60)).padStart(2, "0");
+  const s = String(secs % 60).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
 
 export function Home() {
-  const { snapshot, error } = useOnShift();
+  const { snapshot } = useOnShift();
   const d = deployment;
   const [name, setName] = useState("");
   const live = snapshot?.passes.filter((p) => p.state === "live") ?? [];
   const example = live[0];
+  const exampleRole = example && snapshot ? snapshot.presets[example.presetId]?.name ?? "Cashier" : "Cashier";
+  const [demoLeft, setDemoLeft] = useState(3 * 3600 + 41 * 60 + 12);
+  const total = 4 * 3600;
+
+  useEffect(() => {
+    const id = setInterval(() => setDemoLeft((n) => Math.max(0, n - 1)), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const check = (value: string) => navigate("verify", value ? { name: value } : undefined);
+  const ringOffset = 527.8 * (1 - demoLeft / total);
+  const org = d?.orgName ?? "onshift.eth";
+  const placeholder = example?.name ?? `shift-0412.ops.${org}`;
 
   return (
-    <div className="landing">
+    <div className="landing night">
       <NetworkNote compact />
       <header className="landing-bar">
-        <div className="app-mark">
-          <span className="app-icon">
-            <Clock3 size={18} strokeWidth={2.4} />
+        <a className="app-mark" href="#/home" aria-label="OnShift home">
+          <img src="/brand/onshift-mark.svg" width={34} height={34} alt="" />
+          <img className="brand-word" src="/brand/onshift-wordmark.svg" height={22} alt="OnShift" />
+        </a>
+        <div className="row landing-nav">
+          <a className="landing-link" href="#attacks">
+            Security
+          </a>
+          <a className="landing-link" href={REPO} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+          <span className="landing-net">
+            <b>●</b> {networkLabel} · ENSv2
           </span>
-          <div className="app-title">OnShift</div>
-        </div>
-        <div className="row">
           <ThemeToggle />
           <Button icon={LayoutGrid} onClick={() => navigate("overview")}>
             Console
@@ -46,34 +75,98 @@ export function Home() {
         </div>
       </header>
 
-      <section className="landing-hero">
-        <h1 className="landing-title">A fake support agent fails this check.</h1>
-        <p className="landing-sub">
-          A real one can only send money back to you. Staff and AI agents get an ENS name for one shift — anyone can resolve it, and the till will not pay a different wallet.
-        </p>
-        <form
-          className="landing-check"
-          onSubmit={(e) => {
-            e.preventDefault();
-            check(name.trim());
-          }}
-        >
-          <input className="input input-lg" placeholder={example ? example.name : `shift-0412.ops.${d?.orgName ?? "onshift.eth"}`} value={name} onChange={(e) => setName(e.target.value)} aria-label="Pass name to check" />
-          <Button variant="primary" size="lg" type="submit" icon={BadgeCheck}>
-            Is it on shift?
-          </Button>
-        </form>
-        {example && (
-          <button className="landing-live" onClick={() => check(example.name)}>
-            <span className="dot-live" /> {example.name} is on shift for <Countdown expiry={example.expiry} />
-          </button>
-        )}
+      <section className="landing-hero night-hero">
+        <div className="hero-copy">
+          <p className="landing-eyebrow">Expiring authority for staff &amp; AI agents · ENSv2</p>
+          <h1 className="landing-title">
+            Authority that <em>clocks out.</em>
+          </h1>
+          <p className="landing-sub">
+            Give a cashier, a support rep or an AI agent an ENS name that works for one shift, can only refund the wallet that paid, and dies on its own. Anyone can check it in one second.
+          </p>
+          <form
+            className="landing-check"
+            onSubmit={(e) => {
+              e.preventDefault();
+              check(name.trim() || placeholder);
+            }}
+          >
+            <input
+              className="input input-lg mono"
+              placeholder={placeholder}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              aria-label="Pass name to check"
+            />
+            <Button variant="primary" size="lg" type="submit" icon={BadgeCheck}>
+              Is it on shift?
+            </Button>
+          </form>
+          <p className="landing-hint">
+            Someone DMed you as support? Paste their name. Demo passes live under <code>*.demo.{org}</code> and are marked DEMO on Public Check.
+          </p>
+        </div>
+
+        <aside className="pass-card" aria-label="Example live pass">
+          <div className="pass-top">
+            <span className="pass-status">
+              <span className="dot-live" /> ON SHIFT
+            </span>
+            <span className="pass-org">{org}</span>
+          </div>
+          <div className="pass-ring">
+            <svg viewBox="0 0 190 190" aria-hidden>
+              <circle cx="95" cy="95" r="84" fill="none" stroke="currentColor" strokeWidth="10" className="pass-ring-track" />
+              <circle
+                cx="95"
+                cy="95"
+                r="84"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="10"
+                strokeLinecap="round"
+                strokeDasharray="527.8"
+                strokeDashoffset={example ? undefined : ringOffset}
+                transform="rotate(-90 95 95)"
+                className="pass-ring-arc"
+              />
+            </svg>
+            <div className="pass-ring-label">
+              <div className="pass-time">{example ? <Countdown expiry={example.expiry} /> : formatLeft(demoLeft)}</div>
+              <div className="pass-time-sub">left on this shift</div>
+            </div>
+          </div>
+          <div className="pass-name mono">
+            {example ? (
+              example.name
+            ) : (
+              <>
+                shift-0412<span>.ops.{org}</span>
+              </>
+            )}
+          </div>
+          <div className="pass-kv">
+            <div>
+              <small>Role</small>
+              <b>{exampleRole}</b>
+            </div>
+            <div>
+              <small>Refund cap</small>
+              <b>bound to payer</b>
+            </div>
+            <div>
+              <small>Transfer</small>
+              <b className="bad">Locked</b>
+            </div>
+          </div>
+          <p className="pass-proof mono">getState() = REGISTERED · roleBitmap = 0 · UniversalResolverV2</p>
+        </aside>
       </section>
 
       <section className="doors">
         {DOORS.map((door) => (
-          <button key={door.route} className="door" onClick={() => navigate(door.route)}>
-            <Tile icon={door.icon} tint={door.route === "try" ? "blue" : "soft"} large />
+          <button key={door.route} className="door" type="button" onClick={() => navigate(door.route)}>
+            <door.icon size={22} strokeWidth={2.2} />
             <div className="door-title">{door.title}</div>
             <div className="door-body">{door.body}</div>
             <div className="door-cta">
@@ -83,73 +176,24 @@ export function Home() {
         ))}
       </section>
 
-      <section className="steps">
-        {STEPS.map((step, i) => (
-          <div key={step.title} className="step">
-            <div className="step-num">{i + 1}</div>
-            <div>
-              <div className="step-title">
-                <step.icon size={15} /> {step.title}
-              </div>
-              <div className="step-body">{step.body}</div>
-            </div>
+      <section id="attacks" className="attacks-section">
+        <p className="landing-eyebrow">Steal the phone. Try anything.</p>
+        <h2 className="section-title">The chain says no — with a reason.</h2>
+        <div className="attacks">
+          <div className="attacks-head">
+            <span>What a thief tries</span>
+            <span>What happens</span>
+            <span>Who enforces it</span>
           </div>
-        ))}
+          {ATTACKS.map((row) => (
+            <div key={row.try} className="attacks-row">
+              <span>{row.try}</span>
+              <span className={row.ok ? "ok" : "err"}>{row.result}</span>
+              <span>{row.who}</span>
+            </div>
+          ))}
+        </div>
       </section>
-
-      {snapshot && d && (
-        <section className="proof">
-          <div className="proof-stats">
-            <div>
-              <div className="proof-value">{live.length}</div>
-              <div className="proof-label">on shift now</div>
-            </div>
-            <div>
-              <div className="proof-value">{snapshot.passes.length}</div>
-              <div className="proof-label">passes issued</div>
-            </div>
-            <div>
-              <div className="proof-value">{snapshot.orders.length}</div>
-              <div className="proof-label">orders paid</div>
-            </div>
-            <div>
-              <div className="proof-value">{usdc(snapshot.gateFloat)}</div>
-              <div className="proof-label">in the gate (test USDC)</div>
-            </div>
-          </div>
-          <p className="small secondary">
-            Every number here is read from {networkLabel} {error ? "(reconnecting…)" : "right now"}. Contracts:{" "}
-            <a href={explorerAddress(d.passIssuer)} target="_blank" rel="noreferrer">
-              PassIssuer
-            </a>
-            ,{" "}
-            <a href={explorerAddress(d.shiftGate)} target="_blank" rel="noreferrer">
-              ShiftGate
-            </a>
-            {d.playground && (
-              <>
-                ,{" "}
-                <a href={explorerAddress(d.playground)} target="_blank" rel="noreferrer">
-                  Playground
-                </a>
-              </>
-            )}
-            . Source on{" "}
-            <a href={REPO} target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-            .
-          </p>
-          <div className="row" style={{ justifyContent: "center", flexWrap: "wrap" }}>
-            <Button icon={CreditCard} onClick={() => navigate("pay")}>
-              Pay as a Customer
-            </Button>
-            <Button icon={Bot} onClick={() => navigate("deployment")}>
-              How It's Deployed
-            </Button>
-          </div>
-        </section>
-      )}
     </div>
   );
 }
