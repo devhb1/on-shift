@@ -18,6 +18,15 @@ interface IPermissionedResolver {
         external
         returns (bool);
 
+    function grantRoles(uint256 resource, uint256 roleBitmap, address account) external returns (bool);
+
+    function resource(bytes32 node, bytes32 part) external pure returns (uint256);
+
+    /// @notice Resolver-level alias: `fromName` serves `toName`'s records. Empty `toName` clears it.
+    function setAlias(bytes calldata fromName, bytes calldata toName) external;
+
+    function getAlias(bytes calldata name) external view returns (bytes memory);
+
     function setAddr(bytes32 node, uint256 coinType, bytes calldata value) external;
 
     function setText(bytes32 node, string calldata key, string calldata value) external;

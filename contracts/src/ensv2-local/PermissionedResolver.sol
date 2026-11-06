@@ -26,6 +26,8 @@ contract PermissionedResolver is IPermissionedResolver {
     mapping(bytes32 node => mapping(uint256 coinType => bytes)) private _addrs;
     mapping(bytes32 node => mapping(string key => string)) private _texts;
     mapping(bytes32 node => mapping(string key => bytes)) private _data;
+    mapping(bytes32 fromNode => bytes32 toNode) private _aliasNode;
+    mapping(bytes32 fromNode => bytes toName) private _aliasDns;
 
     event EACRolesChanged(
         uint256 indexed resource, address indexed account, uint256 oldRoleBitmap, uint256 newRoleBitmap
@@ -33,6 +35,7 @@ contract PermissionedResolver is IPermissionedResolver {
     event AddressChanged(bytes32 indexed node, uint256 coinType, bytes newAddress);
     event TextChanged(bytes32 indexed node, string indexed indexedKey, string key, string value);
     event DataChanged(bytes32 indexed node, string indexed indexedKey, string key, bytes value);
+    event AliasChanged(bytes indexed indexedFromName, bytes indexed indexedToName, bytes fromName, bytes toName);
 
     error EACUnauthorizedAccountRoles(uint256 resource, uint256 roleBitmap, address account);
     error EACCannotGrantRoles(uint256 resource, uint256 roleBitmap, address account);
@@ -99,6 +102,34 @@ contract PermissionedResolver is IPermissionedResolver {
         return true;
     }
 
+    function grantRoles(uint256 res, uint256 roleBitmap, address account) external returns (bool) {
+        _checkCanGrant(res, roleBitmap);
+        _grant(res, roleBitmap, account);
+        return true;
+    }
+
+    function setAlias(bytes calldata fromName, bytes calldata toName) external {
+        bytes32 fromNode = NameHash.namehash(fromName);
+        _checkPart(fromNode, 0, ResolverRoles.ROLE_SET_ALIAS);
+        if (toName.length <= 1) {
+            delete _aliasNode[fromNode];
+            delete _aliasDns[fromNode];
+        } else {
+            _aliasNode[fromNode] = NameHash.namehash(toName);
+            _aliasDns[fromNode] = toName;
+        }
+        emit AliasChanged(fromName, toName, fromName, toName);
+    }
+
+    function getAlias(bytes calldata name) external view returns (bytes memory) {
+        return _aliasDns[NameHash.namehash(name)];
+    }
+
+    function _follow(bytes32 node) internal view returns (bytes32) {
+        bytes32 to = _aliasNode[node];
+        return to == bytes32(0) ? node : to;
+    }
+
     function _checkCanGrant(uint256 res, uint256 roleBitmap) internal view {
         uint256 adminBits = (_roles[res][msg.sender] | _roles[ROOT_RESOURCE][msg.sender]) >> 128;
         if (roleBitmap & ~(adminBits | (adminBits << 128)) != 0) {
@@ -153,14 +184,14 @@ contract PermissionedResolver is IPermissionedResolver {
     }
 
     function addr(bytes32 node, uint256 coinType) external view returns (bytes memory) {
-        return _addrs[node][coinType];
+        return _addrs[_follow(node)][coinType];
     }
 
     function text(bytes32 node, string calldata key) external view returns (string memory) {
-        return _texts[node][key];
+        return _texts[_follow(node)][key];
     }
 
     function data(bytes32 node, string calldata key) external view returns (bytes memory) {
-        return _data[node][key];
+        return _data[_follow(node)][key];
     }
 }

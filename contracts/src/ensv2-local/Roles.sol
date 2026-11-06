@@ -28,6 +28,8 @@ library RegistryRoles {
 library ResolverRoles {
     uint256 internal constant ROLE_SET_ADDR = 1 << 0;
     uint256 internal constant ROLE_SET_TEXT = 1 << 4;
+    /// @dev Same bit ENSv2 uses for resolver-level setAlias (namespace suffix rewrite).
+    uint256 internal constant ROLE_SET_ALIAS = 1 << 8;
     uint256 internal constant ROLE_SET_DATA = 1 << 36;
     uint256 internal constant ROLE_UPGRADE = 1 << 124;
 
