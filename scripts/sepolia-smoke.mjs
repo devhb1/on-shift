@@ -142,12 +142,13 @@ await expectRevert("refund more than the order", staff, d.shiftGate, gateAbi, "r
 await expectRevert("refund over the cap", staff, d.shiftGate, gateAbi, "refund", [label, order, 41_000_000n], "OverCap");
 
 if (d.playground) {
-  console.log("4b. Anyone can try it: a Playground pass for another burner");
+  console.log("4b. Anyone can try it: a sandbox Playground pass under demo.<org>");
   const visitor = privateKeyToAccount(generatePrivateKey());
-  const r = await sendReceipt(lead, d.playground, playgroundAbi, "tryIt", [visitor.address, 0, 3600n, 5_000_000n, ""]);
+  const r = await sendReceipt(lead, d.playground, playgroundAbi, "tryIt", [visitor.address, 0, 3600n, 5_000_000n]);
   const tried = r.logs.find((l) => l.address.toLowerCase() === d.playground.toLowerCase());
-  check(!!tried, `playground pass issued  https://sepolia.etherscan.io/tx/${r.transactionHash}`);
-  await expectRevert("playground cap above $5", lead, d.playground, playgroundAbi, "tryIt", [visitor.address, 0, 3600n, 5_000_001n, ""], "CapTooHigh");
+  check(!!tried, `playground demo pass issued  https://sepolia.etherscan.io/tx/${r.transactionHash}`);
+  await expectRevert("playground cap above $5", lead, d.playground, playgroundAbi, "tryIt", [visitor.address, 0, 3600n, 5_000_001n], "CapTooHigh");
+  check(Boolean(d.sandboxGate), "sandboxGate present for demo float/orders");
 }
 
 console.log("5. Nobody sends a transaction. Waiting for the shift to end…");

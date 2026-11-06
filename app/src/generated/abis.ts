@@ -39,6 +39,19 @@ export const passIssuerAbi = [
   },
   {
     "type": "function",
+    "name": "DEMO_NODE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "FACTORY",
     "inputs": [],
     "outputs": [
@@ -173,6 +186,96 @@ export const passIssuerAbi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "demo",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPermissionedRegistry"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "demoDnsName",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "demoPresetCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDemoPreset",
+    "inputs": [
+      {
+        "name": "presetId",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct PassIssuer.Preset",
+        "components": [
+          {
+            "name": "name",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "maxCap",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxDuration",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "actions",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "agent",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "active",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -337,6 +440,45 @@ export const passIssuerAbi = [
   },
   {
     "type": "function",
+    "name": "issueDemo",
+    "inputs": [
+      {
+        "name": "label",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "holder",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "demoPresetId",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "duration",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "cap",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "tokenId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "issuedOnDay",
     "inputs": [
       {
@@ -469,6 +611,19 @@ export const passIssuerAbi = [
   },
   {
     "type": "function",
+    "name": "playground",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "presetCount",
     "inputs": [],
     "outputs": [
@@ -518,6 +673,19 @@ export const passIssuerAbi = [
   },
   {
     "type": "function",
+    "name": "setPlayground",
+    "inputs": [
+      {
+        "name": "pg",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPresetActive",
     "inputs": [
       {
@@ -546,6 +714,43 @@ export const passIssuerAbi = [
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "DemoPresetUpdated",
+    "inputs": [
+      {
+        "name": "presetId",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "maxCap",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxDuration",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "actions",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -679,6 +884,19 @@ export const passIssuerAbi = [
   },
   {
     "type": "event",
+    "name": "PlaygroundUpdated",
+    "inputs": [
+      {
+        "name": "playground",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "PresetUpdated",
     "inputs": [
       {
@@ -781,6 +999,16 @@ export const passIssuerAbi = [
   },
   {
     "type": "error",
+    "name": "NotPlayground",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PlayLabelReserved",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "UnknownPass",
     "inputs": []
   },
@@ -821,12 +1049,30 @@ export const shiftGateAbi = [
         "internalType": "bytes32"
       },
       {
+        "name": "isDemo",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
         "name": "org_",
         "type": "address",
         "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "IS_DEMO",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1113,6 +1359,19 @@ export const shiftGateAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "registryLabel",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -2188,7 +2447,7 @@ export const playgroundAbi = [
         "internalType": "address"
       },
       {
-        "name": "presetId",
+        "name": "demoPresetId",
         "type": "uint8",
         "internalType": "uint8"
       },
@@ -2201,11 +2460,6 @@ export const playgroundAbi = [
         "name": "cap",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "agentContext",
-        "type": "string",
-        "internalType": "string"
       }
     ],
     "outputs": [

@@ -56,6 +56,8 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
     uint8 internal constant SUPPORT = 1;
     uint8 internal constant AI_AGENT = 2;
     uint8 internal constant DOOR = 3;
+    uint8 internal constant DEMO_CASHIER = 0;
+    uint8 internal constant DEMO_AGENT = 1;
 
     function setUp() public virtual {
         if (block.timestamp < 1_800_000_000) vm.warp(1_800_000_000);
@@ -68,6 +70,7 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         s.incidentSwitch.setWatchtower(watchtower);
         s.incidentSwitch.setAuditor(auditor);
         usdc.mint(address(s.gate), 500e6);
+        usdc.mint(address(s.sandboxGate), 50e6);
         vm.stopPrank();
         vm.deal(lead, 10 ether);
         order = _pay(customer, 100e6);
@@ -100,6 +103,22 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
     function _node(string memory label) internal view returns (bytes32) {
         return s.opsNode.child(label);
+    }
+
+    function _demoNode(string memory label) internal view returns (bytes32) {
+        return s.demoNode.child(label);
+    }
+
+    function _demoResolverOf(string memory label) internal view returns (IPermissionedResolver) {
+        return IPermissionedResolver(s.demo.getResolver(label));
+    }
+
+    function _sandboxPay(address payer, uint256 amount) internal returns (bytes32 orderId) {
+        usdc.mint(payer, amount);
+        vm.startPrank(payer);
+        usdc.approve(address(s.sandboxGate), amount);
+        orderId = s.sandboxGate.pay(amount);
+        vm.stopPrank();
     }
 
     // ---------------------------------------------------------------- issuance
@@ -612,58 +631,66 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         vm.stopPrank();
     }
 
-    // ---------------------------------------------------------------- playground
+    // ---------------------------------------------------------------- playground (sandbox under demo.<org>)
 
     function _playground() internal returns (Playground pg) {
         pg = new Playground(s.issuer);
         vm.prank(org);
-        s.issuer.setLead(address(pg), 100, true);
+        s.issuer.setPlayground(address(pg));
     }
 
-    function test_Playground_anyoneIssuesARealPass() public {
+    function test_Playground_anyoneIssuesADemoPass() public {
         Playground pg = _playground();
         vm.deal(attacker, 1 ether);
         vm.prank(attacker);
-        string memory label = pg.tryIt{value: 0.01 ether}(staff, CASHIER, 1 hours, 5e6, "");
-        assertEq(label, "play-1");
+        string memory label = pg.tryIt{value: 0.01 ether}(staff, DEMO_CASHIER, 1 hours, 5e6);
+        assertTrue(bytes(label).length == 13); // play- + 8 hex
         assertEq(staff.balance, 0.01 ether);
 
-        // the same ENSv2 guarantees as an org pass
         uint256 id = NameHash.labelId(label);
-        assertEq(ops.getState(id).latestOwner, staff);
-        assertEq(ITestRegistry(address(ops)).roles(id, staff), 0);
-        assertTrue(s.gate.passStatus(label).live);
+        assertEq(s.demo.getState(id).latestOwner, staff);
+        assertEq(ITestRegistry(address(s.demo)).roles(id, staff), 0);
+        assertEq(uint8(ops.getState(id).status), uint8(IPermissionedRegistry.Status.AVAILABLE));
+        assertFalse(s.gate.passStatus(label).live);
+        assertTrue(s.sandboxGate.passStatus(label).live);
 
+        IPermissionedResolver r = _demoResolverOf(label);
+        assertEq(r.text(_demoNode(label), "role"), "Demo cashier");
+        assertEq(r.text(_demoNode(label), "org"), "onshift.eth");
+
+        bytes32 sandboxOrder = _sandboxPay(customer, 10e6);
         vm.prank(staff);
-        s.gate.refund(label, order, 5e6);
+        s.sandboxGate.refund(label, sandboxOrder, 5e6);
         vm.prank(staff);
         vm.expectRevert(abi.encodeWithSelector(ShiftGate.OverCap.selector, 0));
-        s.gate.refund(label, order, 1);
+        s.sandboxGate.refund(label, sandboxOrder, 1);
     }
 
     function test_Playground_limits() public {
         Playground pg = _playground();
         vm.startPrank(attacker);
         vm.expectRevert(Playground.CapTooHigh.selector);
-        pg.tryIt(staff, CASHIER, 1 hours, 5e6 + 1, "");
+        pg.tryIt(staff, DEMO_CASHIER, 1 hours, 5e6 + 1);
         vm.expectRevert(Playground.DurationTooLong.selector);
-        pg.tryIt(staff, CASHIER, 1 hours + 1, 1e6, "");
+        pg.tryIt(staff, DEMO_CASHIER, 1 hours + 1, 1e6);
         for (uint256 i; i < 3; ++i) {
-            pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+            pg.tryIt(staff, DEMO_CASHIER, 1 hours, 1e6);
         }
         vm.expectRevert(Playground.TooManyToday.selector);
-        pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+        pg.tryIt(staff, DEMO_CASHIER, 1 hours, 1e6);
         vm.stopPrank();
 
         vm.warp(block.timestamp + 1 days);
         vm.prank(attacker);
-        assertEq(pg.tryIt(staff, CASHIER, 1 hours, 1e6, ""), "play-4");
+        string memory label = pg.tryIt(staff, DEMO_CASHIER, 1 hours, 1e6);
+        assertEq(pg.count(), 4);
+        assertTrue(s.sandboxGate.passStatus(label).live);
     }
 
     function test_Playground_onlyRequesterRevokes() public {
         Playground pg = _playground();
         vm.prank(attacker);
-        string memory label = pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+        string memory label = pg.tryIt(staff, DEMO_CASHIER, 1 hours, 1e6);
 
         vm.prank(customer);
         vm.expectRevert(Playground.NotRequester.selector);
@@ -671,16 +698,22 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
 
         vm.prank(attacker);
         pg.revoke(label);
-        assertFalse(s.gate.passStatus(label).live);
+        assertFalse(s.sandboxGate.passStatus(label).live);
     }
 
     function test_Playground_stopsWhenTheOrgSaysSo() public {
         Playground pg = _playground();
         vm.prank(org);
-        s.issuer.setLead(address(pg), 0, false);
+        s.issuer.setPlayground(address(0));
         vm.prank(attacker);
-        vm.expectRevert(PassIssuer.NotLead.selector);
-        pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+        vm.expectRevert(PassIssuer.NotPlayground.selector);
+        pg.tryIt(staff, DEMO_CASHIER, 1 hours, 1e6);
+    }
+
+    function test_Issue_rejectsPlayPrefixOnOps() public {
+        vm.prank(lead);
+        vm.expectRevert(PassIssuer.PlayLabelReserved.selector);
+        s.issuer.issue("play-dead", staff, DOOR, 1 hours, 0, "");
     }
 
     // ---------------------------------------------------------------- multi-tenant shops

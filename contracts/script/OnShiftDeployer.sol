@@ -34,12 +34,16 @@ abstract contract OnShiftDeployer {
         IPermissionedRegistry parent; // the org's registry: holds the children of <org>.eth
         IPermissionedResolver parentResolver; // <org>.eth's own resolver
         IPermissionedRegistry ops; // UserRegistry serving *.ops.<org>.eth
+        IPermissionedRegistry demo; // UserRegistry serving *.demo.<org>.eth (Playground only)
         IPermissionedRegistry empty; // break-glass target: no names, no usable roles
         PassIssuer issuer;
         ShiftGate gate;
+        ShiftGate sandboxGate; // separate float/orders for demo passes
         IncidentSwitch incidentSwitch;
         bytes32 orgNode;
         bytes32 opsNode;
+        bytes32 demoNode;
+        bytes32 sandboxTillNode;
         bytes orgDnsName;
     }
 
@@ -108,6 +112,7 @@ abstract contract OnShiftDeployer {
         s.orgDnsName = NameHash.dnsEncode(orgName);
         s.orgNode = NameHash.namehash(s.orgDnsName);
         s.opsNode = s.orgNode.child("ops");
+        s.demoNode = s.orgNode.child("demo");
 
         s.parent = _registry(infra, string.concat(orgName, "/registry"), org, ORG_REGISTRY_ROLES);
         s.parentResolver = _resolver(infra, string.concat(orgName, "/resolver"), org);
@@ -135,6 +140,7 @@ abstract contract OnShiftDeployer {
         shop.orgDnsName = NameHash.dnsEncode(shopName);
         shop.orgNode = NameHash.namehash(shop.orgDnsName);
         shop.opsNode = shop.orgNode.child("ops");
+        shop.demoNode = shop.orgNode.child("demo");
 
         // Platform deployer is temporary registry admin so one broadcast can wire the shop.
         // PassIssuer / ShiftGate / IncidentSwitch still treat shopOrg as ORG.
@@ -172,6 +178,7 @@ abstract contract OnShiftDeployer {
         // ops.<org> -> its own UserRegistry. ops has no resolver, so an expired pass has nothing to inherit (C3).
         // Deployer is temporary root so setParent works in the same broadcast; shop org receives the roles after.
         s.ops = _registry(infra, string.concat(orgName, "/ops/0"), deployer, ORG_REGISTRY_ROLES);
+        s.demo = _registry(infra, string.concat(orgName, "/demo/0"), deployer, ORG_REGISTRY_ROLES);
         s.empty = _registry(infra, string.concat(orgName, "/empty"), DEAD, RegistryRoles.ROLE_SET_PARENT);
         s.parent.register(
             "ops",
@@ -184,14 +191,30 @@ abstract contract OnShiftDeployer {
         s.ops.setParent(s.parent, "ops");
         if (deployer != org) s.ops.grantRootRoles(ORG_REGISTRY_ROLES, org);
 
+        s.parent.register(
+            "demo",
+            org,
+            s.demo,
+            address(0),
+            RegistryRoles.ROLE_SET_SUBREGISTRY | RegistryRoles.ROLE_SET_RESOLVER,
+            type(uint64).max
+        );
+        s.demo.setParent(s.parent, "demo");
+        if (deployer != org) s.demo.grantRootRoles(ORG_REGISTRY_ROLES, org);
+
         s.issuer = new PassIssuer(s.parent, infra.factory, infra.resolverImpl, treasury, org, orgName);
         s.ops.grantRootRoles(RegistryRoles.ROLE_REGISTRAR | RegistryRoles.ROLE_UNREGISTER, address(s.issuer));
+        s.demo.grantRootRoles(RegistryRoles.ROLE_REGISTRAR | RegistryRoles.ROLE_UNREGISTER, address(s.issuer));
 
         bytes32 tillNode = s.orgNode.child("till");
+        s.sandboxTillNode = s.orgNode.child("sandbox");
         bytes memory tillDns = NameHash.dnsEncode(string.concat("till.", orgName));
         bytes memory quarantineDns = NameHash.dnsEncode(string.concat("quarantine.", orgName));
         s.parent.register(
             "till", org, IPermissionedRegistry(address(0)), address(s.parentResolver), 0, type(uint64).max
+        );
+        s.parent.register(
+            "sandbox", org, IPermissionedRegistry(address(0)), address(s.parentResolver), 0, type(uint64).max
         );
         s.parent.register(
             "quarantine",
@@ -202,10 +225,16 @@ abstract contract OnShiftDeployer {
             type(uint64).max
         );
         s.parentResolver.setText(tillNode, OnShiftTypes.KEY_TILL_STATUS, "live");
+        s.parentResolver.setText(s.sandboxTillNode, OnShiftTypes.KEY_TILL_STATUS, "live");
         s.parentResolver.setText(s.orgNode.child("quarantine"), OnShiftTypes.KEY_TILL_STATUS, "quarantine");
 
-        s.gate = new ShiftGate(s.parent, s.parentResolver, usdc, s.opsNode, tillNode, org);
+        s.gate = new ShiftGate(s.parent, s.parentResolver, usdc, s.opsNode, tillNode, false, org);
+        s.sandboxGate =
+            new ShiftGate(s.parent, s.parentResolver, usdc, s.demoNode, s.sandboxTillNode, true, org);
         s.parentResolver.setAddr(tillNode, OnShiftTypes.COIN_TYPE_ETH, abi.encodePacked(address(s.gate)));
+        s.parentResolver.setAddr(
+            s.sandboxTillNode, OnShiftTypes.COIN_TYPE_ETH, abi.encodePacked(address(s.sandboxGate))
+        );
 
         s.incidentSwitch = new IncidentSwitch(
             s.parent,

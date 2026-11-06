@@ -27,8 +27,9 @@ contract Deploy is Script, DeploymentWriter {
         s.issuer.setLead(lead, 25, true);
         s.issuer.setLead(org, 10, true);
         usdc.mint(address(s.gate), 500e6);
+        usdc.mint(address(s.sandboxGate), 50e6);
         Playground playground = new Playground(s.issuer);
-        s.issuer.setLead(address(playground), 200, true);
+        s.issuer.setPlayground(address(playground));
         vm.stopBroadcast();
 
         string memory path = _write(s, "local", "", ORG_NAME, startBlock, org, lead, agent, treasury);

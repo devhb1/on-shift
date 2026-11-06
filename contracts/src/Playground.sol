@@ -4,13 +4,11 @@ pragma solidity ^0.8.24;
 import {PassIssuer} from "./PassIssuer.sol";
 
 /// @title Playground
-/// @notice A public shift lead with tight limits, so anyone with a wallet can issue a real pass on the
-///         live deployment. The org registers this contract as a lead; PassIssuer enforces every normal
-///         rule on top (presets, the lead's daily budget, the live namespace, roleBitmap = 0).
+/// @notice Public faucet for *demo* passes under demo.<org>. Never writes into ops.<org>, never
+///         carries real staff role names, and never shares the production till's float or orders.
 ///
-///         Playground passes are named play-<n>, last at most an hour and carry at most $5 of refund
-///         authority. Refunds are bound to paid orders in ShiftGate, so a playground pass cannot pull
-///         money out of the gate that nobody paid in.
+///         Labels are play-<8hex> from keccak(requester, count). Caps stay at $5 / 1 hour / 3 tries
+///         per day. Agent context is forced empty by PassIssuer.issueDemo.
 contract Playground {
     uint256 public constant MAX_CAP = 5e6;
     uint64 public constant MAX_DURATION = 1 hours;
@@ -35,8 +33,9 @@ contract Playground {
         ISSUER = issuer;
     }
 
-    /// @notice Issue a playground pass to `holder`. Any ETH sent is forwarded as the holder's gas.
-    function tryIt(address holder, uint8 presetId, uint64 duration, uint256 cap, string calldata agentContext)
+    /// @notice Issue a sandbox pass to `holder`. Any ETH sent is forwarded as the holder's gas.
+    /// @param demoPresetId 0 = Demo cashier, 1 = Demo agent (see PassIssuer demo presets).
+    function tryIt(address holder, uint8 demoPresetId, uint64 duration, uint256 cap)
         external
         payable
         returns (string memory label)
@@ -47,10 +46,11 @@ contract Playground {
         if (triesOnDay[msg.sender][day] >= MAX_PER_DAY) revert TooManyToday();
         triesOnDay[msg.sender][day] += 1;
 
-        label = string.concat("play-", _toString(++count));
+        uint256 n = ++count;
+        label = string.concat("play-", _hex8(uint32(uint256(keccak256(abi.encode(msg.sender, n))))));
         requesterOf[keccak256(bytes(label))] = msg.sender;
-        ISSUER.issue{value: msg.value}(label, holder, presetId, duration, cap, agentContext);
-        emit Tried(label, msg.sender, holder, presetId, duration, cap);
+        ISSUER.issueDemo{value: msg.value}(label, holder, demoPresetId, duration, cap);
+        emit Tried(label, msg.sender, holder, demoPresetId, duration, cap);
     }
 
     /// @notice End a playground pass early. Only the wallet that asked for it can.
@@ -59,12 +59,15 @@ contract Playground {
         ISSUER.revokeNow(label);
     }
 
-    function _toString(uint256 v) internal pure returns (string memory) {
-        if (v == 0) return "0";
-        uint256 len;
-        for (uint256 x = v; x != 0; x /= 10) ++len;
-        bytes memory b = new bytes(len);
-        for (; v != 0; v /= 10) b[--len] = bytes1(uint8(48 + v % 10));
-        return string(b);
+    function _hex8(uint32 v) internal pure returns (string memory) {
+        bytes16 alphabet = "0123456789abcdef";
+        bytes memory out = new bytes(8);
+        unchecked {
+            for (uint256 i; i < 8; ++i) {
+                out[7 - i] = alphabet[v & 0xf];
+                v >>= 4;
+            }
+        }
+        return string(out);
     }
 }

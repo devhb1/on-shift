@@ -41,8 +41,9 @@ contract DeploySepolia is Script, DeploymentWriter {
         s.issuer.setLead(lead, 50, true);
         if (lead != org) s.issuer.setLead(org, 10, true);
         MockUSDC(SepoliaENSv2.MOCK_USDC).mint(address(s.gate), 1_000e6); // ENSv2 testnet MockUSDC: open mint
+        MockUSDC(SepoliaENSv2.MOCK_USDC).mint(address(s.sandboxGate), 100e6);
         Playground playground = new Playground(s.issuer);
-        s.issuer.setLead(address(playground), 200, true);
+        s.issuer.setPlayground(address(playground));
         vm.stopBroadcast();
 
         string memory path = _write(

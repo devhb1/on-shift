@@ -10,6 +10,8 @@ export type Deployment = {
   orgName: string;
   orgNode: Hex;
   opsNode: Hex;
+  demoNode?: Hex;
+  sandboxTillNode?: Hex;
   org: Address;
   lead: Address;
   agent: Address;
@@ -21,11 +23,14 @@ export type Deployment = {
   parentRegistry: Address;
   parentResolver: Address;
   opsRegistry: Address;
+  demoRegistry?: Address;
   emptyRegistry: Address;
   passIssuer: Address;
   shiftGate: Address;
+  /** Separate till for Playground demo passes. */
+  sandboxGate?: Address;
   incidentSwitch: Address;
-  /** Public lead with tight limits. Absent on deployments made before it existed. */
+  /** Public faucet for demo.<org> passes only. */
   playground?: Address;
   /** First block of the current ShiftGate, when it was replaced after the first deployment. */
   gateStartBlock?: number;

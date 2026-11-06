@@ -19,7 +19,12 @@ const DURATIONS = [
   { value: "3600", label: "1 hour" },
 ];
 
-/** Playground: any wallet acts as a shift lead with tight limits, on the live deployment. */
+/** Playground: anyone can mint a *demo* pass under demo.<org> — never ops staff roles. */
+const DEMO_PRESETS = [
+  { id: 0, name: "Demo cashier", agent: false, maxCap: BigInt(MAX_CAP * 1e6) },
+  { id: 1, name: "Demo agent", agent: true, maxCap: BigInt(MAX_CAP * 1e6) },
+] as const;
+
 export function TryPage() {
   const { snapshot } = useOnShift();
   const { operator, connectWallet, devices, addDevice, setDevice, run, busy, notify } = useSession();
@@ -27,9 +32,9 @@ export function TryPage() {
   const d = deployment!;
   const me = operator?.signer.address;
 
-  const presets = s.presets.filter((p) => p.active && (p.name === "Cashier" || p.agent || p.name === "Door staff"));
+  const presets = DEMO_PRESETS;
   const agentPreset = presets.find((p) => p.agent);
-  const [presetId, setPresetId] = useState(agentPreset?.id ?? presets[0]?.id ?? 0);
+  const [presetId, setPresetId] = useState(agentPreset?.id ?? 0);
   const [seconds, setSeconds] = useState("1800");
   const [cap, setCap] = useState(String(MAX_CAP));
   const [holderChoice, setHolderChoice] = useState<"new" | "paste">("new");
@@ -37,7 +42,7 @@ export function TryPage() {
   const [triesLeft, setTriesLeft] = useState<number>();
   const [justIssued, setJustIssued] = useState<string>();
 
-  const preset = s.presets[presetId];
+  const preset = presets.find((p) => p.id === presetId) ?? presets[0];
   const capUnits = (() => {
     try {
       return toUsdcUnits(cap);
@@ -48,6 +53,7 @@ export function TryPage() {
   const effectiveCap = preset && preset.maxCap === 0n ? 0n : capUnits;
   const capOk = effectiveCap >= 0n && effectiveCap <= BigInt(MAX_CAP * 1e6) && effectiveCap <= (preset?.maxCap ?? 0n);
   const mine = s.passes.filter((p) => sameAddress(p.requester, me));
+  const demoSuffix = `.demo.${d.orgName}`;
 
   useEffect(() => {
     if (!me || !d.playground) return setTriesLeft(undefined);
@@ -88,15 +94,15 @@ export function TryPage() {
           address: d.playground!,
           abi: playgroundAbi,
           functionName: "tryIt",
-          args: [holder, presetId, BigInt(seconds), effectiveCap, preset?.agent ? "Playground agent: small refunds only." : ""],
+          args: [holder, presetId, BigInt(seconds), effectiveCap],
           value: GAS_DRIP_WEI,
         });
         const [tried] = parseEventLogs({ abi: playgroundAbi, logs: receipt.logs, eventName: "Tried" });
         label = tried?.args.label ?? "";
         return receipt;
       },
-      "Pass issued",
-      "A real ENSv2 name with its own resolver and no transfer rights.",
+      "Demo pass issued",
+      `A sandbox name under demo.${d.orgName} — not real staff.`,
     );
     if (ok && label) {
       setJustIssued(label);
@@ -105,14 +111,14 @@ export function TryPage() {
   };
 
   const revoke = (label: string) =>
-    run("revoke", () => send(operator!.signer, { address: d.playground!, abi: playgroundAbi, functionName: "revoke", args: [label] }), "Pass ended", `${label}.ops.${d.orgName} no longer verifies.`);
+    run("revoke", () => send(operator!.signer, { address: d.playground!, abi: playgroundAbi, functionName: "revoke", args: [label] }), "Pass ended", `${label}${demoSuffix} no longer verifies.`);
 
   return (
     <Shell>
       <div style={{ textAlign: "center", padding: "12px 0 0" }}>
         <h1 className="large-title">Try OnShift</h1>
         <p className="page-sub">
-          Issue a real ENSv2 name, pay an order, then try to refund it to yourself — the chain refuses. Default role is an AI agent so the name is something a stranger can check. Up to an hour, up to ${MAX_CAP}.
+          Mint a sandbox pass under demo.{d.orgName}. It never looks like real staff and cannot touch the production till. Up to an hour, up to ${MAX_CAP}.
         </p>
       </div>
 
@@ -175,7 +181,7 @@ export function TryPage() {
           {justIssued && (
             <Group pad>
               <div className="stack-sm" style={{ textAlign: "center" }}>
-                <div style={{ fontWeight: 700 }}>{justIssued}.ops.{d.orgName} is live</div>
+                <div style={{ fontWeight: 700 }}>{justIssued}{demoSuffix} is live (demo)</div>
                 <div className="row" style={{ justifyContent: "center", flexWrap: "wrap" }}>
                   <Button variant="primary" icon={Smartphone} onClick={() => navigate("device")}>
                     Open Staff App

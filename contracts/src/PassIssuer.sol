@@ -22,6 +22,7 @@ import {PassResolverLib} from "./PassResolverLib.sol";
 ///         - C7  everything keyed by labelhash; token IDs are treated as mutable
 ///         - the `ops` subregistry is always read through the parent's LIVE pointer, so a break-glass
 ///           re-point (IncidentSwitch) also stops issuance into the dead namespace
+///         - Playground mints only into `demo` via issueDemo; production `issue` refuses play- labels
 contract PassIssuer {
     using NameHash for bytes32;
 
@@ -62,11 +63,17 @@ contract PassIssuer {
     /// @dev Organisation authority. Transferable so a Safe can replace an EOA without redeploying.
     address public org;
     bytes32 public immutable OPS_NODE;
+    bytes32 public immutable DEMO_NODE;
     string public orgName;
     /// @dev DNS-encoded "ops.<orgName>", used for per-name resolver grants.
     bytes public opsDnsName;
+    /// @dev DNS-encoded "demo.<orgName>" for sandbox pass resolvers.
+    bytes public demoDnsName;
+    /// @dev Only this contract may call issueDemo. Cleared by the org to shut the faucet.
+    address public playground;
 
     Preset[] internal _presets;
+    Preset[] internal _demoPresets;
     Pass[] internal _passes;
     mapping(address lead => Lead) public leads;
     mapping(address lead => mapping(uint256 day => uint32)) public issuedOnDay;
@@ -85,18 +92,24 @@ contract PassIssuer {
     );
     event PassRevoked(uint256 indexed index, string label, address indexed by);
     event LeadUpdated(address indexed lead, uint32 dailyBudget, bool active);
+    event PlaygroundUpdated(address indexed playground);
     event PresetUpdated(
+        uint8 indexed presetId, string name, uint256 maxCap, uint64 maxDuration, uint8 actions
+    );
+    event DemoPresetUpdated(
         uint8 indexed presetId, string name, uint256 maxCap, uint64 maxDuration, uint8 actions
     );
 
     error NotOrg();
     error NotLead();
+    error NotPlayground();
     error NotAuthorizedToRevoke();
     error DailyBudgetExhausted();
     error InvalidDuration();
     error InvalidPreset();
     error CapAboveLimit();
     error InvalidLabel();
+    error PlayLabelReserved();
     error InvalidHolder();
     error GasDripTooHigh();
     error GasDripFailed();
@@ -128,6 +141,8 @@ contract PassIssuer {
         orgName = orgName_;
         opsDnsName = NameHash.dnsEncode(string.concat("ops.", orgName_));
         OPS_NODE = NameHash.namehash(opsDnsName);
+        demoDnsName = NameHash.dnsEncode(string.concat("demo.", orgName_));
+        DEMO_NODE = NameHash.namehash(demoDnsName);
 
         // Default presets. Caps in USDC base units (6 decimals).
         _addPreset(
@@ -136,6 +151,12 @@ contract PassIssuer {
         _addPreset("Support", 25e6, 8 hours, OnShiftTypes.ACTION_REFUND, false);
         _addPreset("AI agent", 20e6, 1 hours, OnShiftTypes.ACTION_REFUND, true);
         _addPreset("Door staff", 0, 12 hours, OnShiftTypes.ACTION_CHECK_IN, false);
+
+        // Sandbox-only presets: never look like production staff roles.
+        _addDemoPreset(
+            "Demo cashier", 5e6, 1 hours, OnShiftTypes.ACTION_REFUND | OnShiftTypes.ACTION_CHECK_IN, false
+        );
+        _addDemoPreset("Demo agent", 5e6, 1 hours, OnShiftTypes.ACTION_REFUND, true);
     }
 
     // ---------------------------------------------------------------- org administration
@@ -149,6 +170,11 @@ contract PassIssuer {
     function setLead(address lead, uint32 dailyBudget, bool active) external onlyOrg {
         leads[lead] = Lead(dailyBudget, active);
         emit LeadUpdated(lead, dailyBudget, active);
+    }
+
+    function setPlayground(address pg) external onlyOrg {
+        playground = pg;
+        emit PlaygroundUpdated(pg);
     }
 
     function addPreset(string calldata name, uint256 maxCap, uint64 maxDuration, uint8 actions, bool agent)
@@ -171,6 +197,14 @@ contract PassIssuer {
         emit PresetUpdated(uint8(_presets.length - 1), name, maxCap, maxDuration, actions);
     }
 
+    function _addDemoPreset(string memory name, uint256 maxCap, uint64 maxDuration, uint8 actions, bool agent)
+        internal
+    {
+        if (maxDuration < MIN_DURATION || maxDuration > MAX_DURATION) revert InvalidDuration();
+        _demoPresets.push(Preset(name, maxCap, maxDuration, actions, agent, true));
+        emit DemoPresetUpdated(uint8(_demoPresets.length - 1), name, maxCap, maxDuration, actions);
+    }
+
     // ---------------------------------------------------------------- issuance
 
     /// @notice The `ops` registry the parent currently points at (changes on break-glass / restore).
@@ -178,7 +212,13 @@ contract PassIssuer {
         return PARENT.getSubregistry("ops");
     }
 
-    /// @notice Issue a pass. Any ETH sent is forwarded to the holder as a gas allowance.
+    /// @notice Sandbox registry for Playground passes (`demo.<org>`). Not break-glassed with ops.
+    function demo() public view returns (IPermissionedRegistry) {
+        return PARENT.getSubregistry("demo");
+    }
+
+    /// @notice Issue a production pass. Any ETH sent is forwarded to the holder as a gas allowance.
+    ///         Labels starting with `play-` are reserved for the sandbox.
     function issue(
         string calldata label,
         address holder,
@@ -194,6 +234,7 @@ contract PassIssuer {
         if (holder == address(0)) revert InvalidHolder();
         if (msg.value > MAX_GAS_DRIP) revert GasDripTooHigh();
         _validateLabel(label);
+        if (_isPlayLabel(label)) revert PlayLabelReserved();
 
         if (presetId >= _presets.length || !_presets[presetId].active) revert InvalidPreset();
         Preset storage preset = _presets[presetId];
@@ -210,19 +251,76 @@ contract PassIssuer {
         issuedOnDay[msg.sender][day] += 1;
         uint64 expiry = uint64(block.timestamp) + duration;
 
-        // 1) a resolver that serves ONLY this pass (C1)
-        address resolver = _deployPassResolver(label, holder, presetId, expiry, cap, agentContext);
-
-        // 2) the pass itself: roleBitmap = 0 -> cannot transfer, re-point or delegate (C4)
+        address resolver = _deployPassResolver(
+            label, holder, preset, presetId, expiry, cap, agentContext, OPS_NODE, opsDnsName
+        );
         tokenId = opsRegistry.register(label, holder, IPermissionedRegistry(address(0)), resolver, 0, expiry);
+        _recordPass(label, holder, msg.sender, resolver, address(opsRegistry), expiry, presetId, cap, tokenId);
 
+        if (msg.value > 0) {
+            (bool ok,) = holder.call{value: msg.value}("");
+            if (!ok) revert GasDripFailed();
+        }
+    }
+
+    /// @notice Playground-only mint into `demo.<org>`. Always clears agent-context; uses Demo presets.
+    function issueDemo(
+        string calldata label,
+        address holder,
+        uint8 demoPresetId,
+        uint64 duration,
+        uint256 cap
+    ) external payable returns (uint256 tokenId) {
+        if (msg.sender != playground || playground == address(0)) revert NotPlayground();
+        if (holder == address(0)) revert InvalidHolder();
+        if (msg.value > MAX_GAS_DRIP) revert GasDripTooHigh();
+        _validateLabel(label);
+        if (!_isPlayLabel(label)) revert InvalidLabel();
+
+        if (demoPresetId >= _demoPresets.length || !_demoPresets[demoPresetId].active) revert InvalidPreset();
+        Preset storage preset = _demoPresets[demoPresetId];
+        if (duration < MIN_DURATION || duration > preset.maxDuration) revert InvalidDuration();
+        if (cap > preset.maxCap) revert CapAboveLimit();
+
+        IPermissionedRegistry demoRegistry = demo();
+        if (
+            address(demoRegistry).code.length == 0
+                || !demoRegistry.hasRootRoles(RegistryRoles.ROLE_REGISTRAR, address(this))
+        ) revert NamespaceFrozen();
+
+        uint64 expiry = uint64(block.timestamp) + duration;
+        // agentContext always empty — even for the Demo agent preset (F-02 / F02).
+        string memory emptyContext = "";
+        address resolver = _deployPassResolver(
+            label, holder, preset, demoPresetId, expiry, cap, emptyContext, DEMO_NODE, demoDnsName
+        );
+        tokenId = demoRegistry.register(label, holder, IPermissionedRegistry(address(0)), resolver, 0, expiry);
+        _recordPass(label, holder, msg.sender, resolver, address(demoRegistry), expiry, demoPresetId, cap, tokenId);
+
+        if (msg.value > 0) {
+            (bool ok,) = holder.call{value: msg.value}("");
+            if (!ok) revert GasDripFailed();
+        }
+    }
+
+    function _recordPass(
+        string calldata label,
+        address holder,
+        address issuer,
+        address resolver,
+        address registry,
+        uint64 expiry,
+        uint8 presetId,
+        uint256 cap,
+        uint256 tokenId
+    ) internal {
         _passes.push(
             Pass({
                 label: label,
                 holder: holder,
-                issuer: msg.sender,
+                issuer: issuer,
                 resolver: resolver,
-                registry: address(opsRegistry),
+                registry: registry,
                 issuedAt: uint64(block.timestamp),
                 expiry: expiry,
                 presetId: presetId,
@@ -231,31 +329,27 @@ contract PassIssuer {
         );
         uint256 index = _passes.length - 1;
         latestPassIndexPlusOne[keccak256(bytes(label))] = index + 1;
-        emit PassIssued(index, label, holder, msg.sender, presetId, expiry, cap, resolver, tokenId);
-
-        // 3) gas allowance so staff never need a faucet
-        if (msg.value > 0) {
-            (bool ok,) = holder.call{value: msg.value}("");
-            if (!ok) revert GasDripFailed();
-        }
+        emit PassIssued(index, label, holder, issuer, presetId, expiry, cap, resolver, tokenId);
     }
 
     function _deployPassResolver(
         string calldata label,
         address holder,
+        Preset storage preset,
         uint8 presetId,
         uint64 expiry,
         uint256 cap,
-        string calldata agentContext
+        string memory agentContext,
+        bytes32 namespaceNode,
+        bytes memory namespaceDns
     ) internal returns (address resolver) {
-        Preset storage preset = _presets[presetId];
         resolver = PassResolverLib.deploy(
             PassResolverLib.Setup({
                 factory: FACTORY,
                 implementation: RESOLVER_IMPL,
-                salt: uint256(keccak256(abi.encode(label, expiry, _passes.length))),
-                node: OPS_NODE.child(label),
-                dnsName: NameHash.prepend(label, opsDnsName),
+                salt: uint256(keccak256(abi.encode(label, expiry, _passes.length, namespaceNode))),
+                node: namespaceNode.child(label),
+                dnsName: NameHash.prepend(label, namespaceDns),
                 treasury: TREASURY,
                 org: org,
                 holder: holder,
@@ -302,6 +396,14 @@ contract PassIssuer {
         return _presets[presetId];
     }
 
+    function demoPresetCount() external view returns (uint256) {
+        return _demoPresets.length;
+    }
+
+    function getDemoPreset(uint8 presetId) external view returns (Preset memory) {
+        return _demoPresets[presetId];
+    }
+
     /// @dev Labels: 1-32 chars of [a-z0-9-], no leading/trailing hyphen (keeps names unambiguous).
     function _validateLabel(string calldata label) internal pure {
         bytes calldata b = bytes(label);
@@ -311,5 +413,10 @@ contract PassIssuer {
             bool ok = (c >= "a" && c <= "z") || (c >= "0" && c <= "9") || c == "-";
             if (!ok) revert InvalidLabel();
         }
+    }
+
+    function _isPlayLabel(string calldata label) internal pure returns (bool) {
+        bytes calldata b = bytes(label);
+        return b.length >= 5 && b[0] == "p" && b[1] == "l" && b[2] == "a" && b[3] == "y" && b[4] == "-";
     }
 }

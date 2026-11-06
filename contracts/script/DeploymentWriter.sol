@@ -27,6 +27,8 @@ abstract contract DeploymentWriter is OnShiftDeployer {
         VM.serializeString(k, "orgName", orgName);
         VM.serializeBytes32(k, "orgNode", s.orgNode);
         VM.serializeBytes32(k, "opsNode", s.opsNode);
+        VM.serializeBytes32(k, "demoNode", s.demoNode);
+        VM.serializeBytes32(k, "sandboxTillNode", s.sandboxTillNode);
         VM.serializeAddress(k, "org", org);
         VM.serializeAddress(k, "lead", lead);
         VM.serializeAddress(k, "agent", agent);
@@ -38,9 +40,11 @@ abstract contract DeploymentWriter is OnShiftDeployer {
         VM.serializeAddress(k, "parentRegistry", address(s.parent));
         VM.serializeAddress(k, "parentResolver", address(s.parentResolver));
         VM.serializeAddress(k, "opsRegistry", address(s.ops));
+        VM.serializeAddress(k, "demoRegistry", address(s.demo));
         VM.serializeAddress(k, "emptyRegistry", address(s.empty));
         VM.serializeAddress(k, "passIssuer", address(s.issuer));
         VM.serializeAddress(k, "shiftGate", address(s.gate));
+        VM.serializeAddress(k, "sandboxGate", address(s.sandboxGate));
         string memory json = VM.serializeAddress(k, "incidentSwitch", address(s.incidentSwitch));
         path = _path();
         VM.writeJson(json, path);

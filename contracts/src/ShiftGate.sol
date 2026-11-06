@@ -9,7 +9,7 @@ import {OnShiftTypes} from "./OnShiftTypes.sol";
 
 /// @title ShiftGate
 /// @notice The place where expiry actually bites. Every gated action re-derives authority from ENS:
-///         1. follow the parent's LIVE `ops` pointer (so break-glass kills every pass in one tx)
+///         1. follow the parent's LIVE registry pointer for this gate (`ops` or `demo`)
 ///         2. liveness = registry getState(labelhash): REGISTERED && now < expiry   (never "does it resolve?", C3)
 ///         3. caller must be latestOwner (latestOwner ignores expiry, hence step 2 first, C7)
 ///         4. scope = the pass resolver's issuer-only `pass.scope` data record, bound to this expiry
@@ -17,14 +17,20 @@ import {OnShiftTypes} from "./OnShiftTypes.sol";
 ///         Refunds are bound to orders paid through `pay()`: the money can only go back to the wallet that
 ///         paid, and never more than it paid. A pass holder cannot name the recipient, so the cap bounds
 ///         mistakes and the order binding rules out self-dealing.
+///
+///         Production gates use registry label "ops". The Playground sandbox uses a second gate on "demo"
+///         so demo passes never share float or orders with the real till.
 contract ShiftGate {
     using NameHash for bytes32;
 
     IPermissionedRegistry public immutable PARENT;
     IPermissionedResolver public immutable TILL_RESOLVER;
     IERC20 public immutable USDC;
+    /// @dev Namehash of the pass namespace (`ops.<org>` or `demo.<org>`).
     bytes32 public immutable OPS_NODE;
     bytes32 public immutable TILL_NODE;
+    /// @dev When true, this gate reads `demo` (Playground sandbox). When false, it reads `ops`.
+    bool public immutable IS_DEMO;
     address public org;
 
     /// @dev keccak256(registry, labelId, expiry) => spent during that one registration
@@ -85,6 +91,7 @@ contract ShiftGate {
         IERC20 usdc,
         bytes32 opsNode,
         bytes32 tillNode,
+        bool isDemo,
         address org_
     ) {
         PARENT = parent;
@@ -92,8 +99,13 @@ contract ShiftGate {
         USDC = usdc;
         OPS_NODE = opsNode;
         TILL_NODE = tillNode;
+        IS_DEMO = isDemo;
         if (org_ == address(0)) revert ZeroOrg();
         org = org_;
+    }
+
+    function registryLabel() public view returns (string memory) {
+        return IS_DEMO ? "demo" : "ops";
     }
 
     function transferOrg(address next) external {
@@ -150,13 +162,13 @@ contract ShiftGate {
         view
         returns (bytes32 shiftKey, OnShiftTypes.Scope memory scope)
     {
-        // 1) the LIVE pointer, every call
-        IPermissionedRegistry opsRegistry = PARENT.getSubregistry("ops");
-        if (address(opsRegistry).code.length == 0) revert PassNotLive();
+        // 1) the LIVE pointer for this gate's registry label, every call
+        IPermissionedRegistry passRegistry = PARENT.getSubregistry(registryLabel());
+        if (address(passRegistry).code.length == 0) revert PassNotLive();
 
         // 2) liveness from registry state only
         uint256 id = NameHash.labelId(label);
-        IPermissionedRegistry.State memory s = opsRegistry.getState(id);
+        IPermissionedRegistry.State memory s = passRegistry.getState(id);
         if (s.status != IPermissionedRegistry.Status.REGISTERED || block.timestamp >= s.expiry) {
             revert PassNotLive();
         }
@@ -165,7 +177,7 @@ contract ShiftGate {
         if (s.latestOwner != msg.sender) revert NotPassHolder();
 
         // 4) scope from the pass's own resolver, written by the issuer only
-        address resolver = opsRegistry.getResolver(label);
+        address resolver = passRegistry.getResolver(label);
         scope = abi.decode(
             IPermissionedResolver(resolver).data(OPS_NODE.child(label), OnShiftTypes.KEY_SCOPE),
             (OnShiftTypes.Scope)
@@ -174,25 +186,25 @@ contract ShiftGate {
         if (scope.expiry != s.expiry) revert ScopeMismatch();
         if (scope.actions & action == 0) revert ActionNotAllowed();
 
-        shiftKey = keccak256(abi.encode(address(opsRegistry), id, s.expiry));
+        shiftKey = keccak256(abi.encode(address(passRegistry), id, s.expiry));
     }
 
     // ---------------------------------------------------------------- views for verifiers and UIs
 
     /// @notice Everything a public "is this agent on shift?" page needs, derived the same way the gate does.
     function passStatus(string calldata label) external view returns (PassStatus memory p) {
-        IPermissionedRegistry opsRegistry = PARENT.getSubregistry("ops");
-        if (address(opsRegistry).code.length == 0) return p;
+        IPermissionedRegistry passRegistry = PARENT.getSubregistry(registryLabel());
+        if (address(passRegistry).code.length == 0) return p;
 
         uint256 id = NameHash.labelId(label);
-        IPermissionedRegistry.State memory s = opsRegistry.getState(id);
+        IPermissionedRegistry.State memory s = passRegistry.getState(id);
         p.registryStatus = uint8(s.status);
         p.expiry = s.expiry;
         p.latestOwner = s.latestOwner;
         p.live = s.status == IPermissionedRegistry.Status.REGISTERED && block.timestamp < s.expiry;
         if (!p.live) return p;
 
-        p.resolver = opsRegistry.getResolver(label);
+        p.resolver = passRegistry.getResolver(label);
         bytes32 node = OPS_NODE.child(label);
         bytes memory raw = IPermissionedResolver(p.resolver).data(node, OnShiftTypes.KEY_SCOPE);
         if (raw.length == 0) return p;
@@ -204,7 +216,7 @@ contract ShiftGate {
         p.cap = scope.cap;
         p.actions = scope.actions;
         p.presetId = scope.presetId;
-        p.spent = spent[keccak256(abi.encode(address(opsRegistry), id, s.expiry))];
+        p.spent = spent[keccak256(abi.encode(address(passRegistry), id, s.expiry))];
         p.shiftStatus = IPermissionedResolver(p.resolver).text(node, OnShiftTypes.KEY_STATUS);
     }
 
