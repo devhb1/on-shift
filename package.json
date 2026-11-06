@@ -10,11 +10,15 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "export": "node scripts/export-abis.mjs",
-    "test": "cd contracts && forge test -vv",
+    "test": "cd contracts && forge test --no-match-contract SepoliaFork -vv",
     "test:gas": "cd contracts && forge test --gas-report",
     "build": "cd contracts && forge build && cd .. && npm run export && npm --workspace app run build",
     "typecheck": "npm --workspace app run typecheck",
-    "agent": "node scripts/agent-demo.mjs"
+    "agent": "node scripts/agent-demo.mjs",
+    "test:fork": "cd contracts && set -a && . ./.env && set +a && forge test --match-contract SepoliaForkTest -vv",
+    "deploy:sepolia": "cd contracts && set -a && . ./.env && set +a && forge script script/DeploySepolia.s.sol --rpc-url $SEPOLIA_RPC_URL --private-key $SEPOLIA_PRIVATE_KEY --broadcast --slow --skip-simulation && cd .. && node scripts/export-abis.mjs",
+    "register:sepolia": "set -a && . contracts/.env && set +a && node scripts/register-ens.mjs",
+    "smoke:sepolia": "set -a && . contracts/.env && set +a && node scripts/sepolia-smoke.mjs"
   },
   "engines": {
     "node": ">=20"

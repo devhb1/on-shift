@@ -1,4 +1,4 @@
-// AI-agent demo: a shift lead issues agent-XXXX.ops.acme.eth to an agent wallet with a $20 cap and a
+// AI-agent demo: a shift lead issues agent-XXXX.ops.onshift.eth to an agent wallet with a $20 cap and a
 // 10-minute life. The "agent" then keeps issuing $5 refunds until the chain stops it with OverCap.
 // Run against the local stack started by `npm run dev`.
 import { readFileSync } from "node:fs";
