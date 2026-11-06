@@ -9,6 +9,11 @@ via_ir = true
 evm_version = "cancun"
 fs_permissions = [{ access = "read-write", path = "./deployments" }]
 
+# Sepolia upgrades: link the already-deployed PassResolverLib so forge does not CREATE2 it again.
+#   FOUNDRY_PROFILE=sepolia forge script script/UpgradeToSandbox.s.sol --broadcast ...
+[profile.sepolia]
+libraries = ["src/PassResolverLib.sol:PassResolverLib:0x73c5D324c2BF041B0b1dB48de18bdAfEafe50D90"]
+
 [fmt]
 line_length = 110
 tab_width = 4
