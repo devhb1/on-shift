@@ -8,7 +8,7 @@
 
 `shift-0412.ops.onshift.eth` proves to any wallet or contract that its holder acts for **onshift.eth** *right now*, lets them touch only what you allow, can never be transferred, and stops working by itself when the shift ends. Nobody has to remember to revoke it.
 
-![Tests](https://img.shields.io/badge/tests-25%20local%20%2B%2025%20on%20real%20ENSv2%20fork-34c759)
+![Tests](https://img.shields.io/badge/tests-34%20local%20%2B%2034%20on%20real%20ENSv2%20fork-34c759)
 ![Sepolia](https://img.shields.io/badge/live-Sepolia%20ENSv2-0071e3)
 ![ENS](https://img.shields.io/badge/onshift.eth-registered-5856d6)
 ![License](https://img.shields.io/badge/license-MIT-8e8e93)
@@ -30,7 +30,7 @@ Outsiders have it worse. A customer has **no reliable way to check** whether the
 | | |
 |---|---|
 | **Issue** | A shift lead gives a staff phone or AI agent wallet a name like `shift-0412.ops.onshift.eth`, with a role, a spending limit and an end time. One transaction. |
-| **Use** | The holder refunds or checks people in through `ShiftGate`, up to the limit, and can update one public status note. They can't redirect payouts, raise their limit, or hand the pass on. |
+| **Use** | A customer pays an order into `ShiftGate`. The holder refunds that order, up to the pass cap, always back to the wallet that paid. They can't pick a recipient, redirect payouts, raise the limit, or hand the pass on. |
 | **Expire** | At the end time the pass stops working. No revoke transaction, no cron job. |
 | **Verify** | Anyone types the name into a public page and sees **On shift** / **Not on shift**, the role and the time left, read straight from ENS. Look-alike orgs (`onshlft.eth`) are flagged. |
 | **Break glass** | One org transaction re-points the `ops` namespace and stops every pass at once. Recovery uses a *fresh* namespace, so nothing old comes back. |
@@ -54,8 +54,10 @@ OnShift runs on the **real ENSv2 contracts** from [`ensdomains/contracts-v2`](ht
 |---|---|
 | `onshift.eth` | [ENS app](https://sepolia.app.ens.domains/onshift.eth) · registered via ETHRegistrar ([tx](https://sepolia.etherscan.io/tx/0x657f254454ac2bfb360093ae2768597ff32c949579dbb09c0f1766c3d5a1fd34)) |
 | PassIssuer | [`0x52Cb54327539594428C0B564Ff3755A2F6A35BB2`](https://sepolia.etherscan.io/address/0x52Cb54327539594428C0B564Ff3755A2F6A35BB2) |
-| ShiftGate | [`0xA7e16d8f43dF36017b821e9B54eDCbBf891d8516`](https://sepolia.etherscan.io/address/0xA7e16d8f43dF36017b821e9B54eDCbBf891d8516) |
+| ShiftGate | [`0x199C363D7081A05a55c4c507A5Ffb45dC1Da3052`](https://sepolia.etherscan.io/address/0x199C363D7081A05a55c4c507A5Ffb45dC1Da3052) |
+| Playground | [`0xee3F81Fa7f5dE99546f4066bc6ffE6a5586DD2CE`](https://sepolia.etherscan.io/address/0xee3F81Fa7f5dE99546f4066bc6ffE6a5586DD2CE) |
 | IncidentSwitch | [`0x4ACC1bBBBAF446Ae027D907C0a50636ada3C0ba0`](https://sepolia.etherscan.io/address/0x4ACC1bBBBAF446Ae027D907C0a50636ada3C0ba0) |
+| Previous ShiftGate | [`0xA7e16d8f43dF36017b821e9B54eDCbBf891d8516`](https://sepolia.etherscan.io/address/0xA7e16d8f43dF36017b821e9B54eDCbBf891d8516) |
 | PassResolverLib | [`0x188e1Bf065D64390c38Cab4D14d0A767F120d5FD`](https://sepolia.etherscan.io/address/0x188e1Bf065D64390c38Cab4D14d0A767F120d5FD) |
 | onshift.eth registry (UserRegistry proxy) | [`0x0206b730986F9CBc171a7AAfCB72Ab242d6E4229`](https://sepolia.etherscan.io/address/0x0206b730986F9CBc171a7AAfCB72Ab242d6E4229) |
 | onshift.eth resolver (PermissionedResolver proxy) | [`0xF5f08043362E7Fa5c12134e98fd18f9A1Ca2a307`](https://sepolia.etherscan.io/address/0xF5f08043362E7Fa5c12134e98fd18f9A1Ca2a307) |
@@ -67,24 +69,30 @@ Full list: [`contracts/deployments/11155111.json`](contracts/deployments/1115511
 ### Live end-to-end check (`npm run smoke:sepolia`)
 
 ```
-OnShift live check on Sepolia ENSv2 — shift-2521.ops.onshift.eth
-1. Shift lead issues a 90-second Cashier pass (cap $50) with a gas allowance
-   ✓ issued  https://sepolia.etherscan.io/tx/0x14d2f78e0f5eaee5524809914caca1ed9631a0e0c3eba4f2610a71b046b9378c
+OnShift live check on Sepolia ENSv2 — shift-2524.ops.onshift.eth
+0. A customer pays two orders into the gate
+   ✓ paid $60 and $5
+1. Shift lead issues a 90-second Cashier pass (cap $50)
+   ✓ issued
    ✓ gate says ON SHIFT, cap $50
 2. ENS resolution through the Universal Resolver
    ✓ resolves: role="Cashier", org="onshift.eth"
 3. The holder uses the pass
    ✓ status updated to “Lane 3”
-   ✓ refunded $10  https://sepolia.etherscan.io/tx/0x8c490ba3cc9e9c85d7f0f2a1a889aba7211e1d032c7ad885a5dfd8b4e4c13537
+   ✓ refunded $10 to the wallet that paid
 4. The holder turns rogue
    ✓ redirect payouts: blocked with EACUnauthorizedAccountRoles
    ✓ raise own cap: blocked with EACUnauthorizedAccountRoles
    ✓ transfer the pass: blocked with TransferDisallowed
+   ✓ refund to an order nobody paid: blocked with UnknownOrder
+   ✓ refund more than the order: blocked with OverRefund
    ✓ refund over the cap: blocked with OverCap
+4b. Anyone can try it: a Playground pass for another burner
+   ✓ playground pass issued
+   ✓ playground cap above $5: blocked with CapTooHigh
 5. Nobody sends a transaction. Waiting for the shift to end…
    ✓ refund after the shift: blocked with PassNotLive
    ✓ gate says NOT ON SHIFT
-   ✓ registry no longer points at the pass resolver
 All checks passed on Sepolia ENSv2.
 ```
 
