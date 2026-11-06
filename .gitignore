@@ -21,5 +21,8 @@ app/src/generated/deployments.json
 
 # Product docs stay on disk only
 docs/
+
+# Local review / improvement notes
+z-new-improve/
 contracts/broadcast/**/dry-run/
 contracts/broadcast/**/run-[0-9]*.json
