@@ -15,6 +15,7 @@ const contracts = [
   "ShiftGate",
   "IncidentSwitch",
   "Playground",
+  "ShopFactory",
   "PermissionedRegistry",
   "PermissionedResolver",
   "MockUSDC",

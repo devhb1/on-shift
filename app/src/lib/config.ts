@@ -112,7 +112,8 @@ export const ensAppUrl = (name: string) => (CHAIN_ID === sepolia.id ? `https://s
 /** ENS UniversalResolverV2 on Sepolia: the same entry point wallets and explorers use. */
 export const UNIVERSAL_RESOLVER: Address | undefined = CHAIN_ID === sepolia.id ? "0x85eDf8B6b7D4211e2b07AA687506B746357B92cf" : undefined;
 
-/** Organisations this verifier trusts. Anything else is flagged, and look-alikes are called out. */
+/** Organisations this verifier trusts. Anything else is flagged, and look-alikes are called out.
+ *  Multi-tenant shops enrol through ShopFactory; until that address is in deployments.json this is the platform name. */
 export const VERIFIED_ORGS = deployment ? [deployment.orgName] : [];
 
 export const USDC_DECIMALS = 6;

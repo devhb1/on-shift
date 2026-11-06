@@ -13,6 +13,7 @@ import {PassIssuer} from "../src/PassIssuer.sol";
 import {ShiftGate} from "../src/ShiftGate.sol";
 import {IncidentSwitch} from "../src/IncidentSwitch.sol";
 import {Playground} from "../src/Playground.sol";
+import {ShopFactory} from "../src/ShopFactory.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {IERC20} from "../src/interfaces/IERC20.sol";
 import {OnShiftTypes} from "../src/OnShiftTypes.sol";
@@ -680,6 +681,75 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         vm.prank(attacker);
         vm.expectRevert(PassIssuer.NotLead.selector);
         pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+    }
+
+    // ---------------------------------------------------------------- multi-tenant shops
+
+    function test_ShopA_breakGlass_doesNotKillShopB() public {
+        address orgA = makeAddr("shop-a");
+        address orgB = makeAddr("shop-b");
+        address leadA = makeAddr("lead-a");
+        address leadB = makeAddr("lead-b");
+        address staffA = makeAddr("staff-a");
+        address staffB = makeAddr("staff-b");
+
+        vm.startPrank(org);
+        ShopFactory book = new ShopFactory(s.parent, org);
+        System memory shopA = _openShopUnder(s, "onshift.eth", "acme", org, orgA, orgA, IERC20(address(usdc)));
+        System memory shopB = _openShopUnder(s, "onshift.eth", "beta", org, orgB, orgB, IERC20(address(usdc)));
+        book.enroll("acme", orgA, address(shopA.issuer), address(shopA.gate));
+        book.enroll("beta", orgB, address(shopB.issuer), address(shopB.gate));
+        vm.stopPrank();
+
+        assertTrue(book.isEnrolled("acme"));
+        assertTrue(book.isEnrolled("beta"));
+        assertFalse(book.isEnrolled("ghost"));
+
+        vm.prank(orgA);
+        shopA.issuer.setLead(leadA, 5, true);
+        vm.prank(orgB);
+        shopB.issuer.setLead(leadB, 5, true);
+        usdc.mint(address(shopA.gate), 100e6);
+        usdc.mint(address(shopB.gate), 100e6);
+
+        bytes32 orderA = _payTo(shopA.gate, customer, 20e6);
+        bytes32 orderB = _payTo(shopB.gate, customer, 20e6);
+
+        vm.prank(leadA);
+        shopA.issuer.issue("shift-a", staffA, CASHIER, 4 hours, 50e6, "");
+        vm.prank(leadB);
+        shopB.issuer.issue("shift-b", staffB, CASHIER, 4 hours, 50e6, "");
+
+        vm.prank(orgA);
+        shopA.incidentSwitch.breakGlass("acme till stolen");
+
+        vm.prank(staffA);
+        vm.expectRevert(ShiftGate.PassNotLive.selector);
+        shopA.gate.refund("shift-a", orderA, 1e6);
+
+        // beta is a separate UserRegistry. acme's break-glass never touches it.
+        vm.prank(staffB);
+        shopB.gate.refund("shift-b", orderB, 1e6);
+        assertTrue(shopB.gate.passStatus("shift-b").live);
+    }
+
+    function test_UnregisteredOrg_cannotIssue() public {
+        ShopFactory book = new ShopFactory(s.parent, org);
+        assertFalse(book.isEnrolled("ghost"));
+        // issuance still requires ROLE_REGISTRAR on that shop's ops registry. A stranger with no
+        // enrolled shop has no PassIssuer to call, and the platform PassIssuer only writes into ops.
+        vm.prank(attacker);
+        vm.expectRevert(PassIssuer.NotLead.selector);
+        s.issuer.issue("ghost-1", staff, CASHIER, 1 hours, 1e6, "");
+        book; // enrolment book is the look-alike source for the app
+    }
+
+    function _payTo(ShiftGate gate, address payer, uint256 amount) internal returns (bytes32 orderId) {
+        usdc.mint(payer, amount);
+        vm.startPrank(payer);
+        usdc.approve(address(gate), amount);
+        orderId = gate.pay(amount);
+        vm.stopPrank();
     }
 
     // ---------------------------------------------------------------- views

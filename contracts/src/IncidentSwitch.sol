@@ -86,6 +86,7 @@ contract IncidentSwitch {
         bytes32 tillNode,
         address org,
         address gate,
+        address issuer,
         IPermissionedRegistry emptyRegistry,
         IVerifiableFactory factory,
         address registryImpl,
@@ -98,6 +99,7 @@ contract IncidentSwitch {
         TILL_NODE = tillNode;
         ORG = org;
         GATE = gate;
+        passIssuer = issuer;
         EMPTY_REGISTRY = emptyRegistry;
         FACTORY = factory;
         REGISTRY_IMPL = registryImpl;
