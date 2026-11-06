@@ -12,6 +12,7 @@ import {NameHash} from "../src/ensv2-local/NameHash.sol";
 import {PassIssuer} from "../src/PassIssuer.sol";
 import {ShiftGate} from "../src/ShiftGate.sol";
 import {IncidentSwitch} from "../src/IncidentSwitch.sol";
+import {Playground} from "../src/Playground.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {IERC20} from "../src/interfaces/IERC20.sol";
 import {OnShiftTypes} from "../src/OnShiftTypes.sol";
@@ -516,6 +517,77 @@ abstract contract OnShiftSuite is Test, OnShiftDeployer {
         vm.prank(address(s.incidentSwitch));
         vm.expectPartialRevert(PermissionedResolver.EACUnauthorizedAccountRoles.selector);
         s.parentResolver.setText(s.orgNode, "url", "https://phish.example");
+    }
+
+    // ---------------------------------------------------------------- playground
+
+    function _playground() internal returns (Playground pg) {
+        pg = new Playground(s.issuer);
+        vm.prank(org);
+        s.issuer.setLead(address(pg), 100, true);
+    }
+
+    function test_Playground_anyoneIssuesARealPass() public {
+        Playground pg = _playground();
+        vm.deal(attacker, 1 ether);
+        vm.prank(attacker);
+        string memory label = pg.tryIt{value: 0.01 ether}(staff, CASHIER, 1 hours, 5e6, "");
+        assertEq(label, "play-1");
+        assertEq(staff.balance, 0.01 ether);
+
+        // the same ENSv2 guarantees as an org pass
+        uint256 id = NameHash.labelId(label);
+        assertEq(ops.getState(id).latestOwner, staff);
+        assertEq(ITestRegistry(address(ops)).roles(id, staff), 0);
+        assertTrue(s.gate.passStatus(label).live);
+
+        vm.prank(staff);
+        s.gate.refund(label, order, 5e6);
+        vm.prank(staff);
+        vm.expectRevert(abi.encodeWithSelector(ShiftGate.OverCap.selector, 0));
+        s.gate.refund(label, order, 1);
+    }
+
+    function test_Playground_limits() public {
+        Playground pg = _playground();
+        vm.startPrank(attacker);
+        vm.expectRevert(Playground.CapTooHigh.selector);
+        pg.tryIt(staff, CASHIER, 1 hours, 5e6 + 1, "");
+        vm.expectRevert(Playground.DurationTooLong.selector);
+        pg.tryIt(staff, CASHIER, 1 hours + 1, 1e6, "");
+        for (uint256 i; i < 3; ++i) {
+            pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+        }
+        vm.expectRevert(Playground.TooManyToday.selector);
+        pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(attacker);
+        assertEq(pg.tryIt(staff, CASHIER, 1 hours, 1e6, ""), "play-4");
+    }
+
+    function test_Playground_onlyRequesterRevokes() public {
+        Playground pg = _playground();
+        vm.prank(attacker);
+        string memory label = pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
+
+        vm.prank(customer);
+        vm.expectRevert(Playground.NotRequester.selector);
+        pg.revoke(label);
+
+        vm.prank(attacker);
+        pg.revoke(label);
+        assertFalse(s.gate.passStatus(label).live);
+    }
+
+    function test_Playground_stopsWhenTheOrgSaysSo() public {
+        Playground pg = _playground();
+        vm.prank(org);
+        s.issuer.setLead(address(pg), 0, false);
+        vm.prank(attacker);
+        vm.expectRevert(PassIssuer.NotLead.selector);
+        pg.tryIt(staff, CASHIER, 1 hours, 1e6, "");
     }
 
     // ---------------------------------------------------------------- views
