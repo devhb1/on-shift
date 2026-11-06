@@ -7,6 +7,7 @@ import { PassCard } from "../components/PassCard";
 import { useOnShift, type PassRow } from "../lib/onshift";
 import { useSession } from "../lib/session";
 import { send } from "../lib/tx";
+import { publicClient } from "../lib/clients";
 import { ACTION_CHECK_IN, ACTION_REFUND, GAS_DRIP_WEI, deployment, isLocal } from "../lib/config";
 import { clock, humanDuration, randomLabel, sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { passIssuerAbi } from "../generated/abis";
@@ -30,7 +31,7 @@ const ROLE_COPY: Record<string, string> = {
 
 export function NewPass() {
   const { snapshot, chainOffset } = useOnShift();
-  const { operator, operatorRole, devices, addDevice, setDevice, run, busy } = useSession();
+  const { operator, operatorRole, devices, addDevice, setDevice, run, busy, notify } = useSession();
   const s = snapshot!;
   const d = deployment!;
 
@@ -83,6 +84,24 @@ export function NewPass() {
 
   const issue = async () => {
     if (!operator || !holder) return;
+    try {
+      const balance = await publicClient.getBalance({ address: operator.signer.address });
+      const dripValue = drip ? GAS_DRIP_WEI : 0n;
+      const gasBuffer = isLocal ? 0n : 2_000_000_000_000_000n;
+      if (balance < dripValue + gasBuffer) {
+        notify({
+          tone: "error",
+          title: "Not enough ETH",
+          detail: drip
+            ? "This wallet needs Sepolia ETH for gas and the 0.003 ETH allowance sent to the holder."
+            : "This wallet needs Sepolia ETH to pay for gas.",
+        });
+        return;
+      }
+    } catch (e) {
+      notify({ tone: "error", title: "Couldn't read the wallet balance", detail: e instanceof Error ? e.message : String(e) });
+      return;
+    }
     const ok = await run(
       "issue",
       () =>
@@ -185,8 +204,8 @@ export function NewPass() {
                   onClick={() => chooseHolder(x.id)}
                 />
               ))}
-              <Row icon={Plus} tint="green" title="Set up a staff phone" subtitle="Creates a device key here — open it from Staff App" onClick={() => chooseHolder(addDevice(`Staff phone ${devices.filter((x) => x.kind === "staff").length + 1}`, "staff").id)} />
-              <Row icon={Plus} tint="graphite" title="Set up an AI agent" subtitle="A wallet for an automated agent" onClick={() => chooseHolder(addDevice(`Agent ${devices.filter((x) => x.kind === "agent").length + 1}`, "agent").id)} />
+              <Row icon={Plus} tint="green" title="Set up a staff phone" subtitle="Creates the holder's key in this browser. The pass is issued on chain to that address." onClick={() => chooseHolder(addDevice(`Staff phone ${devices.filter((x) => x.kind === "staff").length + 1}`, "staff").id)} />
+              <Row icon={Plus} tint="graphite" title="Set up an AI agent" subtitle="Creates the agent's key in this browser. The pass is issued on chain to that address." onClick={() => chooseHolder(addDevice(`Agent ${devices.filter((x) => x.kind === "agent").length + 1}`, "agent").id)} />
             </Group>
 
             <Group title="Someone else's device" footer="On a real shift the staff member opens Staff App on their own phone and shows you its device code.">

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { keccak256, toBytes, type Address } from "viem";
 import { AlertTriangle, BadgeCheck, Check, Clock3, Link2, Search, ShieldAlert, X } from "lucide-react";
-import { Button, Countdown, Group, KV, Tile } from "../components/ui";
+import { Button, Countdown, Group, KV, NetworkNote, Tile } from "../components/ui";
 import { publicClient } from "../lib/clients";
 import { passNode } from "../lib/onshift";
 import { deployment, isLocal, networkLabel, VERIFIED_ORGS } from "../lib/config";
@@ -124,10 +124,11 @@ export function Verify({ initialName }: { initialName: string }) {
           <a href="#/overview">For organizations</a>
         </div>
       </nav>
+      <NetworkNote compact />
 
       <section className="hero">
         <h1 className="hero-title">Is this person really on shift?</h1>
-        <p className="hero-sub">Check any OnShift name before you share a code, a payment or your details. The answer comes from Ethereum, not from us.</p>
+        <p className="hero-sub">Check a pass name before you share a code, a payment, or your details. The answer is read from Ethereum{isLocal ? "" : " Sepolia"}.</p>
         <form
           className="verify-form"
           onSubmit={(e) => {

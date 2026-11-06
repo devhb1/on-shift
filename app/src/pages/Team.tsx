@@ -97,7 +97,7 @@ export function Team() {
           </div>
           <div className="sheet-title">Add a Shift Lead</div>
           <p className="secondary small" style={{ margin: "6px 0 18px" }}>
-            Leads can issue and revoke passes within their daily budget.
+            Leads can issue and revoke passes within their daily budget. Saving an existing wallet replaces its daily budget.
           </p>
           <div className="stack-sm">
             <Field label="Wallet address">

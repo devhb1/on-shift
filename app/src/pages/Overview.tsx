@@ -2,7 +2,7 @@ import { AlertTriangle, ChevronRight, Clock3, Plus, ShieldAlert, ShieldCheck } f
 import { Button, Countdown, Empty, Group, Meter, Row, Tile } from "../components/ui";
 import { useChainNow, useOnShift } from "../lib/onshift";
 import { useSession } from "../lib/session";
-import { deployment } from "../lib/config";
+import { deployment, isLocal } from "../lib/config";
 import { clock, plural, sameAddress, timeAgo, usdc } from "../lib/format";
 import { navigate } from "../App";
 import { ACTIVITY_LOOK, roleLook, whoIs } from "./shared";
@@ -75,7 +75,7 @@ export function Overview() {
           <div className="widget">
             <div className="widget-label" style={{ color: "var(--purple-solid)" }}>{lead ? "Your Budget" : "Gate Float"}</div>
             <div className="widget-value">{lead ? `${lead.remaining}` : usdc(s.gateFloat)}</div>
-            <div className="widget-caption">{lead ? `of ${lead.dailyBudget} passes left today` : "the most passes can ever pay out"}</div>
+            <div className="widget-caption">{lead ? `of ${lead.dailyBudget} passes left today` : isLocal ? "the most passes can ever pay out" : "test USDC the passes can pay out"}</div>
           </div>
         </div>
 

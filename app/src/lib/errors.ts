@@ -1,4 +1,5 @@
 import { BaseError, ContractFunctionRevertedError } from "viem";
+import { isLocal } from "./config";
 
 export type Explained = { name?: string; title: string; detail?: string };
 
@@ -16,7 +17,7 @@ const MESSAGES: Record<string, { title: string; detail: string }> = {
   },
   OverCap: { title: "Over the shift cap", detail: "This refund would exceed the spending cap written into the pass." },
   Replay: { title: "Already processed", detail: "That order or ticket was already handled." },
-  NotOrg: { title: "Org multisig only", detail: "Switch to the Org admin identity to do this." },
+  NotOrg: { title: "Organisation wallet only", detail: "Connect the wallet that administers this organisation." },
   NotLead: { title: "Not a shift lead", detail: "Only an active shift lead can issue passes." },
   NotAuthorizedToRevoke: { title: "Cannot revoke", detail: "Only the lead who issued the pass, or the org, can revoke it." },
   DailyBudgetExhausted: { title: "Daily budget used up", detail: "This lead has issued all passes allowed today." },
@@ -42,7 +43,7 @@ const MESSAGES: Record<string, { title: string; detail: string }> = {
   },
   AlreadyInIncident: { title: "Already in incident mode", detail: "Break-glass is already active." },
   NotInIncident: { title: "Nothing to restore", detail: "The namespace is not in incident mode." },
-  InsufficientBalance: { title: "Gate float empty", detail: "The gate does not hold enough USDC." },
+  InsufficientBalance: { title: "Gate float empty", detail: "The payment gate does not hold enough test USDC for this refund." },
 };
 
 export function explain(error: unknown): Explained {
@@ -58,10 +59,18 @@ export function explain(error: unknown): Explained {
       return { title: "Cancelled", detail: "You declined the request in your wallet." };
     }
     if (/insufficient funds/i.test(error.message)) {
-      return { title: "No gas", detail: "This wallet has no ETH for gas. Issue passes with a gas allowance, or fund the wallet." };
+      return {
+        title: "Not enough ETH",
+        detail: isLocal
+          ? "This wallet has no ETH for gas."
+          : "This wallet needs Sepolia ETH for gas. Passes can include a small gas allowance for the holder.",
+      };
     }
-    if (/fetch|ECONNREFUSED|HTTP request failed/i.test(error.message)) {
-      return { title: "Chain unreachable", detail: "Check your connection, or start the local chain with `npm run dev`." };
+    if (/fetch|ECONNREFUSED|HTTP request failed|Failed to fetch/i.test(error.message)) {
+      return {
+        title: "Chain unreachable",
+        detail: isLocal ? "Start the local chain with npm run dev, then reload." : "The network didn't respond. Wait a moment and try again.",
+      };
     }
     return { title: error.shortMessage };
   }

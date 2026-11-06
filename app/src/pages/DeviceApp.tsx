@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { keccak256, toHex, type Hex } from "viem";
+import { isAddress, keccak256, toHex, type Address, type Hex } from "viem";
 import {
   Bot,
   Check,
@@ -14,14 +14,14 @@ import {
   Ticket,
   Trash2,
 } from "lucide-react";
-import { Button, CopyButton, Empty, Field, Group, Meter, Qr, Row, Sheet } from "../components/ui";
+import { Button, CopyButton, Empty, Field, Group, Meter, NetworkNote, Qr, Row, Sheet } from "../components/ui";
 import { PassCard } from "../components/PassCard";
 import { labelId, passNode, useOnShift, type PassRow } from "../lib/onshift";
 import { useSession } from "../lib/session";
 import { send, simulate } from "../lib/tx";
 import { explain } from "../lib/errors";
 import { publicClient } from "../lib/clients";
-import { ACTION_CHECK_IN, ACTION_REFUND, deployment } from "../lib/config";
+import { ACTION_CHECK_IN, ACTION_REFUND, deployment, isLocal } from "../lib/config";
 import { ATTACKER_ADDRESS, CUSTOMER_ADDRESS, type Device } from "../lib/identities";
 import { clock, sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { permissionedRegistryAbi, permissionedResolverAbi, shiftGateAbi } from "../generated/abis";
@@ -35,6 +35,7 @@ export function DeviceApp() {
 
   return (
     <div className="device-shell">
+      <NetworkNote compact />
       <div className="device">
         <div className="device-bar">
           <button className="btn" onClick={() => setPicking(true)}>
@@ -129,7 +130,7 @@ function Onboarding({ device }: { device: Device }) {
           </div>
           <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: "-0.02em" }}>Show this to your shift lead</div>
           <p className="secondary small">
-            They scan it to give this {device.kind === "agent" ? "agent" : "phone"} a pass. No account, no password, no seed phrase.
+            They paste this code to give this {device.kind === "agent" ? "agent" : "phone"} a pass. The key stays in this browser. Clearing site data deletes it, and the pass cannot be moved.
           </p>
           <div className="mono small secondary">{device.signer.address}</div>
           <div className="row" style={{ justifyContent: "center" }}>
@@ -166,6 +167,7 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
 
   const [sheet, setSheet] = useState<"refund" | "checkin" | "status" | null>(null);
   const [amount, setAmount] = useState("10");
+  const [customer, setCustomer] = useState(isLocal ? CUSTOMER_ADDRESS : "");
   const [ticket, setTicket] = useState("TKT-1042");
   const [status, setStatus] = useState("");
   const [probes, setProbes] = useState<Record<string, Probe>>({});
@@ -177,9 +179,9 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
     if (key === "refund")
       await run(
         "refund",
-        () => send(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, CUSTOMER_ADDRESS, toUsdcUnits(amount), randomId()] }),
+        () => send(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, customer as Address, toUsdcUnits(amount), randomId()] }),
         `Refunded ${usdc(toUsdcUnits(amount))}`,
-        "Paid to the customer from the payment gate.",
+        "Paid from the payment gate to the customer wallet.",
       );
     if (key === "checkin")
       await run(
@@ -332,12 +334,15 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
             <>
               <div className="sheet-title">Refund a Customer</div>
               <p className="secondary small" style={{ margin: "6px 0 18px" }}>
-                {usdc(remaining)} left on this pass. The money comes from {d.orgName}'s payment gate, not from you.
+                {usdc(remaining)} left on this pass. Paid from {d.orgName}'s payment gate, in {isLocal ? "USDC" : "test USDC"}.
               </p>
+              <Field label="Customer wallet" hint={isAddress(customer) ? undefined : "Paste the wallet that should receive the refund."}>
+                <input className="input mono" placeholder="0x…" value={customer} onChange={(e) => setCustomer(e.target.value.trim())} autoFocus />
+              </Field>
               <Field label="Amount">
                 <div className="affix">
                   <input className="input input-lg" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} autoFocus />
-                  <span className="suffix">USDC</span>
+                  <span className="suffix">{isLocal ? "USDC" : "test USDC"}</span>
                 </div>
               </Field>
             </>
@@ -367,7 +372,7 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
             <Button
               block
               variant="primary"
-              disabled={(sheet === "refund" && !Number(amount)) || (sheet === "checkin" && !ticket) || (sheet === "status" && !status)}
+              disabled={(sheet === "refund" && (!Number(amount) || !isAddress(customer))) || (sheet === "checkin" && !ticket) || (sheet === "status" && !status)}
               onClick={() => act(sheet)}
             >
               {sheet === "refund" ? "Refund" : sheet === "checkin" ? "Check In" : "Update"}

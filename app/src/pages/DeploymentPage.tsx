@@ -24,7 +24,7 @@ export function DeploymentPage() {
       <div className="page-head">
         <div>
           <h1 className="large-title">Deployment</h1>
-          <p className="page-sub">Where OnShift runs and which contracts back it. Nothing here is hard-coded in the app.</p>
+          <p className="page-sub">Live contracts for {d.orgName}. Every address is the one deployed on {networkLabel}.</p>
         </div>
         {availableNetworks.length > 1 && (
           <Segmented

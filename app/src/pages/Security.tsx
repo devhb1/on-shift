@@ -5,8 +5,8 @@ import { Gate } from "../components/Gate";
 import { useOnShift } from "../lib/onshift";
 import { useSession } from "../lib/session";
 import { send } from "../lib/tx";
-import { deployment } from "../lib/config";
-import { clock, plural } from "../lib/format";
+import { deployment, isLocal } from "../lib/config";
+import { clock, plural, short } from "../lib/format";
 import { incidentSwitchAbi } from "../generated/abis";
 
 export function Security() {
@@ -75,7 +75,7 @@ export function Security() {
             </div>
           </div>
         </Group>
-        {!isOrg && <Gate need={["org"]} what="Only the org multisig can stop or restore the namespace." />}
+        {!isOrg && <Gate need={["org"]} what="Only the organisation wallet can stop or restore the namespace." />}
 
         <Group
           title="How Stop All Passes works"
@@ -85,6 +85,12 @@ export function Security() {
           <Row icon={Layers} tint="orange" title="Every pass fails at once" subtitle="The payment gate reads the live pointer on every call" />
           <Row icon={AlertOctagon} tint="red" title="Customers are warned" subtitle={`${d.orgName} publishes ops.status = incident for public checks`} />
         </Group>
+
+        {!isLocal && (
+          <Group title="Who holds the keys" footer="A later deployment can move this role to a multisig. This one has not.">
+            <Row icon={KeyRound} tint="orange" title={`Organisation wallet ${short(d.org)}`} subtitle="One key. It can issue, stop every pass, and withdraw the gate float." />
+          </Group>
+        )}
 
         <Group title="Guarantees" footer="Each guarantee comes from ENSv2 or the OnShift contracts, not from this website. They hold even if this site is offline.">
           <Row icon={Clock3} tint="blue" title="Passes end on their own" subtitle="Liveness is read from the ENS registry's state at every use" />

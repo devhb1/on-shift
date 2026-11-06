@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
 import { CheckCircle2, ChevronRight, Copy, Info, Loader2, XCircle, type LucideIcon } from "lucide-react";
 import { useChainNow, type PassState } from "../lib/onshift";
-import { duration } from "../lib/format";
+import { duration, short } from "../lib/format";
+import { deployment, isLocal, networkLabel } from "../lib/config";
 import { useSession } from "../lib/session";
 
 export type Tint = "blue" | "green" | "red" | "orange" | "purple" | "indigo" | "teal" | "graphite" | "soft";
@@ -269,6 +270,17 @@ export function Empty({ icon: Icon, title, children }: { icon: LucideIcon; title
       <Icon size={30} strokeWidth={1.6} color="var(--tertiary)" />
       <div className="empty-title">{title}</div>
       {children && <div className="small">{children}</div>}
+    </div>
+  );
+}
+
+/** Shown on the hosted app so nobody mistakes testnet balances for dollars. */
+export function NetworkNote({ compact = false }: { compact?: boolean }) {
+  if (isLocal || !deployment) return null;
+  return (
+    <div className="net-note">
+      {networkLabel} testnet. Amounts are test USDC, not dollars.
+      {compact ? "" : ` ${deployment.orgName} is administered by ${short(deployment.org)}, one wallet.`}
     </div>
   );
 }
