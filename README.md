@@ -8,7 +8,7 @@
 
 `shift-0412.ops.onshift.eth` proves to any wallet or contract that its holder acts for **onshift.eth** *right now*, lets them touch only what you allow, can never be transferred, and stops working by itself when the shift ends. Refunds are bound to the paying wallet. Nobody has to remember to revoke it.
 
-![Tests](https://img.shields.io/badge/tests-37%20local%20%2B%2037%20on%20real%20ENSv2%20fork-34c759)
+![Tests](https://img.shields.io/badge/tests-41%20local%20%2B%20fork%20suite-34c759)
 ![Sepolia](https://img.shields.io/badge/live-Sepolia%20ENSv2-0071e3)
 ![ENS](https://img.shields.io/badge/onshift.eth-registered-5856d6)
 ![License](https://img.shields.io/badge/license-MIT-8e8e93)
