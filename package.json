@@ -13,7 +13,7 @@
     "test": "cd contracts && forge test --no-match-contract SepoliaFork -vv",
     "test:gas": "cd contracts && forge test --gas-report",
     "build": "cd contracts && forge build && cd .. && npm run export && npm --workspace app run build",
-    "build:web": "node scripts/prepare-web.mjs && npm --workspace app run build",
+    "build:web": "node scripts/prepare-web.mjs && npm --workspace app run build && node scripts/copy-web-dist.mjs",
     "typecheck": "npm --workspace app run typecheck",
     "agent": "node scripts/agent-demo.mjs",
     "test:fork": "cd contracts && set -a && . ./.env && set +a && forge test --match-contract SepoliaForkTest -vv",
