@@ -79,8 +79,8 @@ export function PayPage() {
           </span>
           <div className="row">
             <ThemeToggle />
-            <Button variant="plain" onClick={() => navigate("verify")}>
-              Public Check
+            <Button variant="plain" onClick={() => navigate("home")}>
+              Home
             </Button>
           </div>
         </div>

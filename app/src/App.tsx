@@ -33,8 +33,9 @@ import { Verify } from "./pages/Verify";
 import { Setup } from "./pages/Setup";
 import { PayPage } from "./pages/PayPage";
 import { TryPage } from "./pages/TryPage";
+import { Home } from "./pages/Home";
 
-export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify" | "pay" | "try";
+export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify" | "pay" | "try" | "home";
 
 const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof Activity }[] }[] = [
   {
@@ -61,11 +62,11 @@ const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof 
   },
 ];
 
-const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify", "pay", "try"];
+const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify", "pay", "try", "home"];
 
 function parseHash(): { route: Route; params: URLSearchParams } {
   const [path, query] = window.location.hash.replace(/^#\/?/, "").split("?");
-  const route = (ROUTES as string[]).includes(path) ? (path as Route) : "overview";
+  const route = (ROUTES as string[]).includes(path) ? (path as Route) : "home";
   return { route, params: new URLSearchParams(query ?? "") };
 }
 
@@ -145,7 +146,7 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
   return (
     <div className="console">
       <aside className="sidebar">
-        <div className="app-mark">
+        <div className="app-mark" role="link" tabIndex={0} style={{ cursor: "pointer" }} onClick={() => navigate("home")}>
           <span className="app-icon">
             <Clock3 size={18} strokeWidth={2.4} />
           </span>
@@ -225,6 +226,14 @@ export function App() {
     return (
       <>
         {notReady ? <Setup error={error} /> : <Verify initialName={params.get("name") ?? ""} />}
+        <Toasts />
+      </>
+    );
+  }
+  if (route === "home") {
+    return (
+      <>
+        {!deployment ? <Setup error={error} /> : <Home />}
         <Toasts />
       </>
     );

@@ -239,8 +239,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           </span>
           <div className="row">
             <ThemeToggle />
-            <Button variant="plain" onClick={() => navigate("overview")}>
-              Console
+            <Button variant="plain" onClick={() => navigate("home")}>
+              Home
             </Button>
           </div>
         </div>
