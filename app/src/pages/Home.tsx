@@ -165,6 +165,11 @@ export function Home() {
                   <b className="mono">{short(example.holder)}</b>
                 </div>
               </div>
+              <ul className="pass-rules">
+                <li className="ok">Refund only to the wallet that paid</li>
+                <li className="no">Redirect payouts or raise the cap</li>
+                <li className="no">Transfer the pass to anyone</li>
+              </ul>
               <p className="pass-proof">
                 <button type="button" onClick={() => navigate("verify", { name: example.name })}>
                   Public check

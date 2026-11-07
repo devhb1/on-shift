@@ -1524,6 +1524,91 @@ textarea.input {
   color: var(--blue);
 }
 
+.diagram-shell {
+  --diagram-sky: color-mix(in srgb, #4a90e2 18%, var(--surface));
+  --diagram-teal: color-mix(in srgb, #45c486 16%, var(--surface));
+  --diagram-violet: color-mix(in srgb, #8e71eb 16%, var(--surface));
+  --diagram-peach: color-mix(in srgb, #f5a623 14%, var(--surface));
+  --diagram-coral: color-mix(in srgb, #f86d70 14%, var(--surface));
+  --diagram-ink: var(--surface);
+  margin-top: 12px;
+  border-radius: 16px;
+  background:
+    linear-gradient(var(--separator), var(--separator)) padding-box,
+    radial-gradient(ellipse 80% 60% at 10% 0%, color-mix(in srgb, #4a90e2 12%, transparent), transparent 55%),
+    var(--surface-2);
+  box-shadow: var(--shadow-card);
+  overflow-x: auto;
+  padding: 8px;
+}
+
+.diagram {
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+  color: var(--blue);
+  display: block;
+}
+
+.diagram .node-bg {
+  stroke: var(--separator);
+  stroke-width: 1;
+}
+
+.diagram .node-title {
+  fill: var(--label);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.diagram .node-sub-svg {
+  fill: var(--secondary);
+  font-family: var(--font);
+  font-size: 11px;
+}
+
+.diagram .edge-label {
+  fill: var(--secondary);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.diagram .edge-label.bad {
+  fill: var(--coral);
+}
+
+.how-strength {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.how-strength div {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px;
+}
+
+.how-strength b {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.how-strength span {
+  color: var(--secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+@media (max-width: 800px) {
+  .how-strength {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 800px) {
   .how-roles {
     grid-template-columns: 1fr;
@@ -2248,6 +2333,42 @@ body:has(.landing.ns-light) {
 
 .landing.ns .pass-ring-arc {
   transition: stroke-dashoffset 0.9s linear;
+}
+
+.landing.ns .pass-rules {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.landing.ns .pass-rules li {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ns-body);
+  padding-left: 22px;
+  position: relative;
+}
+
+.landing.ns .pass-rules li::before {
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+}
+
+.landing.ns .pass-rules li.ok::before {
+  content: "✓";
+  color: var(--teal);
+}
+
+.landing.ns .pass-rules li.no {
+  color: var(--ns-muted);
+}
+
+.landing.ns .pass-rules li.no::before {
+  content: "✕";
+  color: var(--coral);
 }
 
 .landing.ns .pass-ring-label {
