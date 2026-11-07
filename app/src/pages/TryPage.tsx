@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { isAddress, parseEventLogs, type Address } from "viem";
 import { BadgeCheck, CreditCard, FlaskConical, Smartphone, Wallet, XOctagon } from "lucide-react";
 import { Button, Countdown, Field, Group, NetworkNote, Row, Segmented, StateBadge } from "../components/ui";
+import { PlayJourney } from "../components/PlayJourney";
 import { useOnShift } from "../lib/onshift";
+import { getPlayLoop, setPlayIssued, subscribePlayLoop } from "../lib/playLoop";
 import { useSession } from "../lib/session";
 import { send } from "../lib/tx";
 import { publicClient } from "../lib/clients";
@@ -42,6 +44,7 @@ export function TryPage() {
   const [pasted, setPasted] = useState("");
   const [triesLeft, setTriesLeft] = useState<number>();
   const [justIssued, setJustIssued] = useState<{ label: string; hash: string; block: string }>();
+  const loop = useSyncExternalStore(subscribePlayLoop, getPlayLoop, () => undefined);
 
   const preset = presets.find((p) => p.id === presetId) ?? presets[0];
   const capUnits = (() => {
@@ -64,6 +67,12 @@ export function TryPage() {
       .then((n) => setTriesLeft(Math.max(0, MAX_PER_DAY - Number(n))))
       .catch(() => setTriesLeft(undefined));
   }, [me, d.playground, s.blockTs, mine.length]);
+
+  useEffect(() => {
+    if (loop?.name || !me) return;
+    const live = s.passes.find((p) => p.sandbox && p.state === "live" && sameAddress(p.requester, me));
+    if (live) setPlayIssued({ label: live.label, name: live.name });
+  }, [loop?.name, me, s.passes]);
 
   if (!d.playground) {
     return (
@@ -111,6 +120,12 @@ export function TryPage() {
     );
     if (ok && issued?.label) {
       setJustIssued(issued);
+      setPlayIssued({
+        label: issued.label,
+        name: `${issued.label}${demoSuffix}`,
+        hash: issued.hash,
+        block: issued.block,
+      });
       if (holderDevice) setDevice(holderDevice.id);
     }
   };
@@ -118,11 +133,12 @@ export function TryPage() {
   const revoke = (label: string) =>
     run("revoke", () => send(operator!.signer, { address: d.playground!, abi: playgroundAbi, functionName: "revoke", args: [label] }), "Pass ended", `${label}${demoSuffix} no longer verifies.`);
 
-  const issuedName = justIssued?.label ? `${justIssued.label}${demoSuffix}` : undefined;
-  const issuedTx = justIssued?.hash ? explorerTx(justIssued.hash) : "";
+  const issuedName = justIssued?.label ? `${justIssued.label}${demoSuffix}` : loop?.name;
+  const issuedTx = (justIssued?.hash ?? loop?.hash) ? explorerTx(justIssued?.hash ?? loop?.hash ?? "") : "";
+  const issuedBlock = justIssued?.block ?? loop?.block;
   const canIssue = busy === null && capOk && triesLeft !== 0 && (holderChoice === "new" || isAddress(pasted));
-  const stage = !me ? 0 : issuedName ? 2 : 1;
-  const journey = ["Connect", "Issue the pass", "Pay the sandbox", "Refund it", "Check the name"];
+  const livePass = mine.find((p) => p.state === "live") ?? s.passes.find((p) => p.sandbox && p.state === "live");
+  const nextName = issuedName ?? livePass?.name;
 
   return (
     <Shell>
@@ -132,14 +148,7 @@ export function TryPage() {
           <p className="page-sub">A sandbox name under demo.{d.orgName}. It cannot touch the production till. Up to an hour, up to ${MAX_CAP}.</p>
         </div>
       </div>
-      <ol className="journey" aria-label="Demo path">
-        {journey.map((label, i) => (
-          <li key={label} className={i === stage ? "here" : i < stage ? "done" : ""}>
-            <span>{i + 1}</span>
-            {label}
-          </li>
-        ))}
-      </ol>
+      <PlayJourney />
 
       <div className="play-grid">
           <div className="play-card">
@@ -203,28 +212,48 @@ export function TryPage() {
 
           <div className="play-side">
             <div className="play-card">
-              {issuedName ? (
+              {nextName ? (
                 <div className="stack-sm">
-                  <div className="play-label">Mined · block {justIssued?.block}</div>
-                  <div className="play-name">{issuedName}</div>
+                  <div className="play-label">{issuedBlock ? `Mined · block ${issuedBlock}` : "Next in the loop"}</div>
+                  <div className="play-name">{nextName}</div>
                   {issuedTx && (
                     <a className="play-tx" href={issuedTx} target="_blank" rel="noreferrer">
                       View transaction ↗
                     </a>
                   )}
-                  <ol className="play-steps">
-                    <li>Pay the sandbox till with the same wallet, or another one.</li>
-                    <li>Open the staff app and refund that order. The money returns only to the payer.</li>
-                    <li>Public Check this name. It should say demo, not staff.</li>
-                  </ol>
+                  {loop?.orderId && !loop.refundedAt && (
+                    <p className="small secondary">Sandbox order ready. Open the staff app and refund it — money returns only to the payer.</p>
+                  )}
+                  {loop?.refundedAt && (
+                    <p className="small secondary">Refunded. Public Check this name — it should say DEMO, not staff.</p>
+                  )}
+                  {!loop?.orderId && (
+                    <ol className="play-steps">
+                      <li>Pay the sandbox till (same wallet or another).</li>
+                      <li>Staff app refunds that order. Payer is fixed on chain.</li>
+                      <li>Public Check this name. It should say demo, not staff.</li>
+                    </ol>
+                  )}
                   <div className="play-actions">
-                    <Button variant="primary" icon={CreditCard} onClick={() => navigate("pay", { demo: "1" })}>
-                      Pay sandbox
-                    </Button>
+                    {!loop?.orderId && (
+                      <Button variant="primary" icon={CreditCard} onClick={() => navigate("pay", { demo: "1" })}>
+                        Next · Pay sandbox
+                      </Button>
+                    )}
+                    {loop?.orderId && !loop.refundedAt && (
+                      <Button variant="primary" icon={Smartphone} onClick={() => navigate("device")}>
+                        Next · Refund in staff app
+                      </Button>
+                    )}
+                    {loop?.refundedAt && (
+                      <Button variant="primary" icon={BadgeCheck} onClick={() => navigate("verify", { name: nextName })}>
+                        Next · Public check
+                      </Button>
+                    )}
                     <Button icon={Smartphone} onClick={() => navigate("device")}>
                       Staff app
                     </Button>
-                    <Button icon={BadgeCheck} onClick={() => navigate("verify", { name: issuedName })}>
+                    <Button icon={BadgeCheck} onClick={() => navigate("verify", { name: nextName })}>
                       Public check
                     </Button>
                   </div>
@@ -238,6 +267,9 @@ export function TryPage() {
                     <li>Refund it from the staff app. The money can only return to the payer.</li>
                     <li>Public Check reads the same name. A look-alike org is flagged.</li>
                   </ol>
+                  {triesLeft === 0 && (
+                    <p className="small secondary">Daily issue limit reached. Use a live pass below, or wait for the next UTC day.</p>
+                  )}
                 </div>
               )}
             </div>

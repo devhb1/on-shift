@@ -226,6 +226,46 @@ export function How() {
           ]}
         />
 
+        <Diagram
+          title="Integrate later · agents and products"
+          caption="Other apps do not need our UI. They read ENSv2 the same way any wallet does, then call ShiftGate with the pass label."
+          width={920}
+          height={168}
+          nodes={[
+            { id: "a", x: 8, y: 28, w: 180, h: 110, title: "Your agent / app", sub: "Holds the pass key for one shift", tone: "violet" },
+            { id: "b", x: 240, y: 28, w: 190, h: 110, title: "Universal Resolver", sub: "org · role · shift.status · $0 read", tone: "sky" },
+            { id: "c", x: 490, y: 28, w: 180, h: 110, title: "getState", sub: "On shift? Expiry? Registry only", tone: "teal" },
+            { id: "d", x: 730, y: 28, w: 170, h: 110, title: "ShiftGate", sub: "refund / checkIn within cap", tone: "peach" },
+          ]}
+          edges={[
+            { from: "a", to: "b" },
+            { from: "a", to: "c" },
+            { from: "c", to: "d", label: "if live" },
+          ]}
+        />
+
+        <section className="how-block">
+          <h2 className="how-kicker">Integration sketch</h2>
+          <div className="how-strength">
+            <div>
+              <b>Read before you trust</b>
+              <span>Resolve the name (or call getState on the registry). If it is not REGISTERED or past expiry, refuse. Demo names under demo.{org} are sandbox only.</span>
+            </div>
+            <div>
+              <b>Act with the holder key</b>
+              <span>Issue puts the pass on a device or agent wallet. That key calls ShiftGate.refund(label, orderId, amount). The recipient is the order payer — never an argument.</span>
+            </div>
+            <div>
+              <b>Orgs keep the console</b>
+              <span>Your product can deep-link to Public Check, or embed the same reads. Issuing staff still goes through PassIssuer with the org wallet (or a future Safe).</span>
+            </div>
+            <div>
+              <b>Agents</b>
+              <span>Demo agent preset forces empty agent-context today. A production agent gets a short-lived name, a cap, and the same gate — your agent runtime signs with the holder key until expiry.</span>
+            </div>
+          </div>
+        </section>
+
         <section className="how-block">
           <h2 className="how-kicker">What makes this a strong project now</h2>
           <div className="how-strength">

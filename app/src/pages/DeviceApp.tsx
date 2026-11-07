@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { isHex, keccak256, toHex, type Hex } from "viem";
 import {
+  BadgeCheck,
   Bot,
   Check,
   CircleDollarSign,
   Clock3,
+  FlaskConical,
   Lock,
   MessageSquare,
   Plus,
@@ -15,8 +17,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button, CopyButton, Empty, Field, Group, Meter, NetworkNote, Qr, Row, Sheet } from "../components/ui";
+import { PlayJourney } from "../components/PlayJourney";
 import { PassCard } from "../components/PassCard";
 import { labelId, passNode, useOnShift, type PassRow } from "../lib/onshift";
+import { getPlayLoop, setPlayRefunded, subscribePlayLoop } from "../lib/playLoop";
 import { passPreset } from "./shared";
 import { useSession } from "../lib/session";
 import { send, simulate } from "../lib/tx";
@@ -45,6 +49,9 @@ export function DeviceApp() {
           </button>
           <div className="row">
             <ThemeToggle />
+            <Button variant="plain" onClick={() => navigate("try")}>
+              Playground
+            </Button>
             <Button variant="plain" onClick={() => navigate("overview")}>
               Console
             </Button>
@@ -167,12 +174,17 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
   const canCheckIn = (preset?.actions & ACTION_CHECK_IN) !== 0;
   const remaining = pass.cap - pass.spent;
 
+  const loop = useSyncExternalStore(subscribePlayLoop, getPlayLoop, () => undefined);
   const [sheet, setSheet] = useState<"refund" | "checkin" | "status" | null>(null);
   const [amount, setAmount] = useState("10");
   const [orderCode, setOrderCode] = useState("");
   const [ticket, setTicket] = useState("TKT-1042");
   const [status, setStatus] = useState("");
   const [probes, setProbes] = useState<Record<string, Probe>>({});
+
+  useEffect(() => {
+    if (pass.sandbox && loop?.orderId && !orderCode) setOrderCode(loop.orderId);
+  }, [pass.sandbox, loop?.orderId, orderCode]);
 
   const node = () => passNode(pass.label, pass.sandbox ? "demo" : "ops");
   const openOrders = s.orders.filter((o) => sameAddress(o.gate, gate) && o.paid > o.refunded);
@@ -189,13 +201,15 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
 
   const act = async (key: "refund" | "checkin" | "status") => {
     setSheet(null);
-    if (key === "refund")
-      await run(
+    if (key === "refund") {
+      const ok = await run(
         "refund",
         () => send(device.signer, { address: gate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, orderCode as Hex, amountUnits] }),
         `Refunded ${usdc(amountUnits)}`,
         "Sent back to the wallet that paid the order.",
       );
+      if (ok && pass.sandbox) setPlayRefunded();
+    }
     if (key === "checkin")
       await run(
         "checkin",
@@ -263,7 +277,35 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
 
   return (
     <div className="stack" style={{ gap: 20 }}>
+      {pass.sandbox && <PlayJourney />}
       <PassCard pass={pass} preset={preset} />
+
+      {pass.sandbox && loop?.orderId && !loop.refundedAt && live && canRefund && (
+        <Group pad>
+          <p className="small secondary" style={{ margin: 0 }}>
+            Playground order ready. Tap Refund — the code is prefilled. Money returns only to the wallet that paid.
+          </p>
+          <Button block variant="primary" icon={CircleDollarSign} disabled={busy !== null} onClick={() => setSheet("refund")} style={{ marginTop: 10 }}>
+            Refund sandbox order
+          </Button>
+        </Group>
+      )}
+
+      {pass.sandbox && loop?.refundedAt && (
+        <Group pad>
+          <p className="small secondary" style={{ margin: 0 }}>
+            Refund confirmed. Public Check should say DEMO for {pass.name}.
+          </p>
+          <div className="play-actions" style={{ marginTop: 10 }}>
+            <Button variant="primary" icon={BadgeCheck} onClick={() => navigate("verify", { name: pass.name })}>
+              Next · Public check
+            </Button>
+            <Button icon={FlaskConical} onClick={() => navigate("try")}>
+              Playground
+            </Button>
+          </div>
+        </Group>
+      )}
 
       {live ? (
         <>
