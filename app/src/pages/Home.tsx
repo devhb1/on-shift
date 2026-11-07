@@ -9,7 +9,15 @@ import { useTheme } from "../lib/theme";
 import { ThemeToggle, navigate, type Route } from "../App";
 
 const REPO = "https://github.com/devhb1/on-shift";
-const RING = 527.8;
+const RING_R = 62;
+const RING = 2 * Math.PI * RING_R;
+
+const USPS = [
+  "Expires by itself — no revoke tx",
+  "Refunds only to the wallet that paid",
+  "Anyone checks the same ENSv2 name",
+  "Sandbox playground · never production",
+];
 
 const ATTACKS: { try: string; result: string; who: string; ok?: boolean }[] = [
   { try: "Send the refund to their own wallet", result: "EACUnauthorizedAccountRoles", who: "Permissioned Resolver" },
@@ -21,10 +29,10 @@ const ATTACKS: { try: string; result: string; who: string; ok?: boolean }[] = [
   { try: "Refund the real customer, within cap", result: "allowed", who: "The only thing a pass can do", ok: true },
 ];
 
-const DOORS: { route: Route; icon: typeof BadgeCheck; title: string; body: string; cta: string; tone: "sky" | "violet" | "teal" }[] = [
-  { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Paste a name. If they DMed you as support, this is the check.", cta: "Public Check", tone: "sky" },
-  { route: "try", icon: FlaskConical, title: "Try a demo pass", body: "Mint under demo.onshift.eth — never real staff, never the production till.", cta: "Playground", tone: "violet" },
-  { route: "device", icon: Smartphone, title: "I'm on shift", body: "Refunds only go back to the wallet that paid.", cta: "Staff App", tone: "teal" },
+const DOORS: { route: Route; icon: typeof BadgeCheck; title: string; cta: string; tone: "sky" | "violet" | "teal" }[] = [
+  { route: "verify", icon: BadgeCheck, title: "Check a name", cta: "Public Check", tone: "sky" },
+  { route: "try", icon: FlaskConical, title: "Try a demo pass", cta: "Playground", tone: "violet" },
+  { route: "device", icon: Smartphone, title: "Staff refund", cta: "Staff App", tone: "teal" },
 ];
 
 export function Home() {
@@ -51,13 +59,16 @@ export function Home() {
   }
 
   return (
-    <div className={`landing ns ${dark ? "ns-dark" : "ns-light"}`}>
+    <div className={`landing ns compact ${dark ? "ns-dark" : "ns-light"}`}>
       <header className="landing-bar">
         <a className="app-mark" href="#/home" aria-label="OnShift home">
-          <img src="/brand/onshift-mark.svg" width={38} height={38} alt="" style={{ borderRadius: 10 }} />
+          <img src="/brand/onshift-mark.svg" width={32} height={32} alt="" style={{ borderRadius: 8 }} />
           <span className="brand-word">OnShift</span>
         </a>
         <div className="row landing-nav">
+          <a className="landing-link keep" href="#/try">
+            Playground
+          </a>
           <a className="landing-link keep" href="#/how">
             How it works
           </a>
@@ -68,7 +79,7 @@ export function Home() {
             GitHub
           </a>
           <span className="landing-net">
-            <b>●</b> {networkLabel} · ENSv2
+            <b>●</b> {networkLabel}
           </span>
           <ThemeToggle />
           <Button className="landing-console" icon={LayoutGrid} onClick={() => navigate("overview")}>
@@ -79,13 +90,20 @@ export function Home() {
 
       <section className="landing-hero night-hero">
         <div className="hero-copy">
-          <p className="landing-eyebrow">Expiring authority for staff &amp; AI agents · ENSv2</p>
+          <p className="landing-eyebrow">Staff &amp; AI agents · ENSv2 · Sepolia</p>
           <h1 className="landing-title">
             Authority that <em>clocks out.</em>
           </h1>
           <p className="landing-sub">
-            Give a cashier, a support rep or an AI agent an ENS name that works for one shift, can only refund the wallet that paid, and dies on its own. Anyone can check it in one second.
+            One ENS name for one shift. Caps what they can touch, refunds only the payer, then dies on its own. Anyone can check.
           </p>
+
+          <ul className="usp-row" aria-label="Why OnShift">
+            {USPS.map((u) => (
+              <li key={u}>{u}</li>
+            ))}
+          </ul>
+
           <form
             className="landing-check"
             onSubmit={(e) => {
@@ -101,12 +119,30 @@ export function Home() {
               aria-label="Pass name to check"
             />
             <Button variant="primary" size="lg" type="submit" icon={BadgeCheck}>
-              Is it on shift?
+              Check
             </Button>
           </form>
-          <p className="landing-hint">
-            Someone DMed you as support? Paste their name. Demo passes live under <code>*.demo.{org}</code> and are marked DEMO on Public Check.
-          </p>
+
+          <div className="hero-ctas">
+            <Button variant="primary" size="lg" icon={FlaskConical} onClick={() => navigate("try")}>
+              Open Playground
+            </Button>
+            <Button size="lg" onClick={() => navigate("how")}>
+              How it works
+            </Button>
+          </div>
+
+          <div className="door-strip" aria-label="Start here">
+            {DOORS.map((door) => (
+              <button key={door.route} type="button" className={`door-chip tone-${door.tone}`} onClick={() => navigate(door.route)}>
+                <door.icon size={15} strokeWidth={2.3} />
+                <span>{door.title}</span>
+                <b>
+                  {door.cta} <ArrowRight size={12} />
+                </b>
+              </button>
+            ))}
+          </div>
         </div>
 
         <aside className="pass-card" aria-label={example ? "Live pass read from Sepolia" : "No pass is on shift"}>
@@ -119,7 +155,7 @@ export function Home() {
                 <span className="pass-org">{org}</span>
               </div>
               <div className="pass-ring">
-                <svg viewBox="0 0 190 190" aria-hidden>
+                <svg viewBox="0 0 140 140" aria-hidden>
                   <defs>
                     <linearGradient id="shiftArc" x1="0%" y1="0%" x2="100%" y2="100%">
                       <stop offset="0%" stopColor="#4A90E2" />
@@ -128,18 +164,18 @@ export function Home() {
                       <stop offset="100%" stopColor="#F5A623" />
                     </linearGradient>
                   </defs>
-                  <circle cx="95" cy="95" r="84" fill="none" stroke="currentColor" strokeWidth="10" className="pass-ring-track" />
+                  <circle cx="70" cy="70" r={RING_R} fill="none" stroke="currentColor" strokeWidth="9" className="pass-ring-track" />
                   <circle
-                    cx="95"
-                    cy="95"
-                    r="84"
+                    cx="70"
+                    cy="70"
+                    r={RING_R}
                     fill="none"
                     stroke="url(#shiftArc)"
-                    strokeWidth="10"
+                    strokeWidth="9"
                     strokeLinecap="round"
                     strokeDasharray={RING}
                     strokeDashoffset={ringOffset}
-                    transform="rotate(-90 95 95)"
+                    transform="rotate(-90 70 70)"
                     className="pass-ring-arc"
                   />
                 </svg>
@@ -147,7 +183,7 @@ export function Home() {
                   <div className="pass-time">
                     <Countdown expiry={example.expiry} />
                   </div>
-                  <div className="pass-time-sub">left on this shift</div>
+                  <div className="pass-time-sub">left</div>
                 </div>
               </div>
               <div className="pass-name mono">{example.name}</div>
@@ -157,7 +193,7 @@ export function Home() {
                   <b>{exampleRole}</b>
                 </div>
                 <div>
-                  <small>Cap left</small>
+                  <small>Cap</small>
                   <b>{example.cap > 0n ? usdc(example.cap - example.spent) : "—"}</b>
                 </div>
                 <div>
@@ -165,11 +201,6 @@ export function Home() {
                   <b className="mono">{short(example.holder)}</b>
                 </div>
               </div>
-              <ul className="pass-rules">
-                <li className="ok">Refund only to the wallet that paid</li>
-                <li className="no">Redirect payouts or raise the cap</li>
-                <li className="no">Transfer the pass to anyone</li>
-              </ul>
               <p className="pass-proof">
                 <button type="button" onClick={() => navigate("verify", { name: example.name })}>
                   Public check
@@ -192,12 +223,12 @@ export function Home() {
                 <span className="pass-status">NOBODY ON SHIFT</span>
                 <span className="pass-org">{org}</span>
               </div>
-              <p className="landing-sub" style={{ marginTop: 18 }}>
-                This card only shows a pass after Sepolia has mined it. There is no sample name and no countdown until then.
+              <p className="landing-sub" style={{ marginTop: 14, fontSize: 14 }}>
+                The timer appears after a real Sepolia pass is mined. Open the Playground to issue one.
               </p>
               <div className="pass-proof">
                 <button type="button" onClick={() => navigate("try")}>
-                  Issue a real demo pass
+                  Issue a demo pass
                 </button>
                 {d && (
                   <a href={explorerAddress(d.passIssuer)} target="_blank" rel="noreferrer">
@@ -208,21 +239,6 @@ export function Home() {
             </>
           )}
         </aside>
-      </section>
-
-      <section className="doors">
-        {DOORS.map((door) => (
-          <button key={door.route} className={`door tone-${door.tone}`} type="button" onClick={() => navigate(door.route)}>
-            <span className="door-icon">
-              <door.icon size={20} strokeWidth={2.2} />
-            </span>
-            <div className="door-title">{door.title}</div>
-            <div className="door-body">{door.body}</div>
-            <div className="door-cta">
-              {door.cta} <ArrowRight size={14} />
-            </div>
-          </button>
-        ))}
       </section>
 
       <section id="attacks" className="attacks-section">

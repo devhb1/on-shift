@@ -2062,7 +2062,7 @@ body:has(.landing.ns-light) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 72px;
+  height: 56px;
   padding: 0;
 }
 
@@ -2151,28 +2151,34 @@ body:has(.landing.ns-light) {
 
 .landing.ns .night-hero {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 56px;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 36px;
   align-items: center;
-  padding: 56px 0 72px;
+  padding: 18px 0 28px;
   text-align: left;
+  min-height: calc(100vh - 56px);
+  min-height: calc(100dvh - 56px);
+}
+
+.landing.ns.compact {
+  padding-bottom: 48px;
 }
 
 .landing.ns .landing-eyebrow {
   font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ns-live);
   margin: 0;
 }
 
 .landing.ns .landing-title {
-  font-size: clamp(42px, 7vw, 72px);
-  line-height: 0.98;
+  font-size: clamp(34px, 4.6vw, 52px);
+  line-height: 1.02;
   letter-spacing: -0.04em;
   font-weight: 800;
-  margin: 18px 0 22px;
+  margin: 10px 0 12px;
   color: var(--ns-fg);
 }
 
@@ -2182,21 +2188,97 @@ body:has(.landing.ns-light) {
 }
 
 .landing.ns .landing-sub {
-  font-size: 19px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.45;
   color: var(--ns-body);
-  max-width: 560px;
+  max-width: 520px;
   margin: 0;
+}
+
+.landing.ns .usp-row {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 560px;
+}
+
+.landing.ns .usp-row li {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ns-fg);
+  background: var(--ns-panel);
+  border: 1px solid var(--ns-line);
+  border-radius: 999px;
+  padding: 6px 11px;
+}
+
+.landing.ns .hero-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.landing.ns .door-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+  max-width: 560px;
+}
+
+.landing.ns .door-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  background: var(--ns-panel);
+  border: 1px solid var(--ns-line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--ns-fg);
+  font: inherit;
+  cursor: pointer;
+  --door-accent: var(--sky);
+}
+
+.landing.ns .door-chip.tone-sky { --door-accent: #4a90e2; }
+.landing.ns .door-chip.tone-violet { --door-accent: #8e71eb; }
+.landing.ns .door-chip.tone-teal { --door-accent: #45c486; }
+
+.landing.ns .door-chip span {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.landing.ns .door-chip b {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--door-accent);
+}
+
+.landing.ns .door-chip svg:first-child {
+  color: var(--door-accent);
+}
+
+.landing.ns .door-chip:hover {
+  border-color: color-mix(in srgb, var(--door-accent) 50%, var(--ns-line));
 }
 
 .landing.ns .landing-check {
   display: flex;
-  margin-top: 34px;
+  margin-top: 16px;
   background: var(--ns-panel);
   border: 1px solid var(--ns-line);
   border-radius: 999px;
-  padding: 6px;
-  max-width: 580px;
+  padding: 5px;
+  max-width: 560px;
   gap: 0;
 }
 
@@ -2235,11 +2317,11 @@ body:has(.landing.ns-light) {
 }
 
 .landing.ns .landing-hint {
-  margin-top: 14px;
-  font-size: 13px;
+  margin-top: 10px;
+  font-size: 12px;
   color: var(--ns-muted);
   max-width: 560px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
 
 .landing.ns .landing-hint code {
@@ -2251,10 +2333,11 @@ body:has(.landing.ns-light) {
   position: relative;
   background: var(--ns-card);
   border: 1px solid var(--ns-card-line);
-  border-radius: 28px;
-  padding: 28px;
+  border-radius: 22px;
+  padding: 18px 18px 16px;
   box-shadow: var(--ns-shadow);
   animation: pass-in 0.7s ease-out both;
+  align-self: center;
 }
 
 @keyframes pass-in {
@@ -2316,9 +2399,9 @@ body:has(.landing.ns-light) {
 .landing.ns .pass-ring {
   display: grid;
   place-items: center;
-  margin: 26px auto 18px;
-  width: 190px;
-  height: 190px;
+  margin: 12px auto 10px;
+  width: 140px;
+  height: 140px;
   position: relative;
 }
 
@@ -2379,19 +2462,19 @@ body:has(.landing.ns-light) {
 
 .landing.ns .pass-time {
   font-family: var(--mono);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .landing.ns .pass-time-sub {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ns-muted);
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .landing.ns .pass-name {
-  font-size: 17px;
+  font-size: 13px;
   text-align: center;
   word-break: break-all;
 }
@@ -2403,28 +2486,28 @@ body:has(.landing.ns-light) {
 .landing.ns .pass-kv {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px;
-  margin-top: 22px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .landing.ns .pass-kv div {
   background: var(--ns-kv);
   border: 1px solid var(--ns-line);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 8px 9px;
 }
 
 .landing.ns .pass-kv small {
   display: block;
   color: var(--ns-muted);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .landing.ns .pass-kv b {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -2433,12 +2516,12 @@ body:has(.landing.ns-light) {
 }
 
 .landing.ns .pass-proof {
-  margin-top: 16px;
+  margin-top: 12px;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px 14px;
-  font-size: 13px;
+  gap: 6px 12px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -2519,7 +2602,7 @@ body:has(.landing.ns-light) {
 }
 
 .landing.ns .attacks-section {
-  padding: 56px 0 24px;
+  padding: 36px 0 24px;
   border-top: 1px solid var(--ns-line);
 }
 
@@ -2584,11 +2667,12 @@ body:has(.landing.ns-light) {
   }
   .landing.ns .night-hero {
     grid-template-columns: 1fr;
-    gap: 36px;
-    padding: 28px 0 48px;
+    gap: 20px;
+    padding: 16px 0 28px;
+    min-height: 0;
   }
   .landing.ns .landing-title {
-    font-size: 42px;
+    font-size: 34px;
   }
   .landing.ns .landing-check {
     flex-direction: column;
@@ -2597,6 +2681,9 @@ body:has(.landing.ns-light) {
   }
   .landing.ns .landing-check .input {
     padding: 12px 14px;
+  }
+  .landing.ns .door-strip {
+    grid-template-columns: 1fr;
   }
   .landing.ns .doors {
     grid-template-columns: 1fr;
@@ -2608,6 +2695,9 @@ body:has(.landing.ns-light) {
   }
   .landing.ns .landing-nav .landing-link {
     display: none;
+  }
+  .landing.ns .landing-nav .landing-link.keep {
+    display: inline;
   }
   .landing.ns .landing-nav .landing-link.keep {
     display: inline;
