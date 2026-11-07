@@ -1530,40 +1530,75 @@ textarea.input {
   }
 }
 
-/* ---------------------------------------------------------------- landing — Night Shift */
+/* ---------------------------------------------------------------- landing (Night / Day Shift) */
 
-body:has(.landing.night) {
+body:has(.landing.ns-dark) {
   background: #0b0f19;
 }
+body:has(.landing.ns-light) {
+  background: #f4f6fa;
+}
 
-.landing.night {
-  --ns-ink: #0b0f19;
-  --ns-ink-2: #121826;
-  --ns-ink-3: #1a2233;
-  --ns-line: #232c40;
-  --ns-paper: #f4f6fa;
-  --ns-muted: #8a93a8;
-  --ns-dim: #5b6478;
+.landing.ns {
   --ns-live: #c6f432;
   --ns-live-ink: #20300a;
   --ns-dead: #ff5a4e;
-  --ns-body: #c3cada;
   --font: "Syne", "Avenir Next", "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   max-width: 1180px;
   margin: 0 auto;
   padding: 0 32px 72px;
-  color: var(--ns-paper);
+  color: var(--ns-fg);
   background:
-    radial-gradient(ellipse 80% 50% at 70% -10%, rgba(198, 244, 50, 0.07), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 10% 30%, rgba(122, 162, 255, 0.06), transparent 50%),
-    var(--ns-ink);
+    radial-gradient(ellipse 80% 50% at 70% -10%, var(--ns-wash-a), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 10% 30%, var(--ns-wash-b), transparent 50%),
+    var(--ns-bg);
   min-height: 100vh;
-  border-radius: 0;
+  font-family: var(--font);
 }
 
-.landing.night .landing-bar {
+.landing.ns-dark {
+  --ns-bg: #0b0f19;
+  --ns-panel: #121826;
+  --ns-line: #232c40;
+  --ns-fg: #f4f6fa;
+  --ns-muted: #8a93a8;
+  --ns-dim: #5b6478;
+  --ns-body: #c3cada;
+  --ns-card: linear-gradient(160deg, #18213a 0%, #0f1526 70%);
+  --ns-card-line: #2a3550;
+  --ns-ring-track: #1e2638;
+  --ns-kv: rgba(255, 255, 255, 0.03);
+  --ns-status-bg: rgba(198, 244, 50, 0.12);
+  --ns-title-em: #c6f432;
+  --ns-wash-a: rgba(198, 244, 50, 0.07);
+  --ns-wash-b: rgba(122, 162, 255, 0.06);
+  --ns-shadow: 0 40px 120px rgba(198, 244, 50, 0.08), 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.landing.ns-light {
+  --ns-bg: #f4f6fa;
+  --ns-panel: #ffffff;
+  --ns-line: #d8dee9;
+  --ns-fg: #0b0f19;
+  --ns-muted: #5b6478;
+  --ns-dim: #8a93a8;
+  --ns-body: #3a4256;
+  --ns-card: linear-gradient(160deg, #ffffff 0%, #eef2f8 100%);
+  --ns-card-line: #d0d7e4;
+  --ns-ring-track: #e2e7f0;
+  --ns-kv: rgba(11, 15, 25, 0.03);
+  --ns-status-bg: rgba(32, 48, 10, 0.08);
+  --ns-title-em: #4d7c0f;
+  --ns-live: #4d7c0f;
+  --ns-live-ink: #f4f6fa;
+  --ns-wash-a: rgba(77, 124, 15, 0.08);
+  --ns-wash-b: rgba(122, 162, 255, 0.08);
+  --ns-shadow: 0 24px 64px rgba(11, 15, 25, 0.08), 0 0 0 1px rgba(11, 15, 25, 0.04);
+}
+
+.landing.ns .landing-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1571,7 +1606,7 @@ body:has(.landing.night) {
   padding: 0;
 }
 
-.landing.night .app-mark {
+.landing.ns .app-mark {
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -1579,30 +1614,32 @@ body:has(.landing.night) {
   color: inherit;
 }
 
-.landing.night .brand-word {
-  display: block;
-  height: 22px;
-  width: auto;
-  filter: brightness(0) invert(1);
+.landing.ns .brand-word {
+  font-family: var(--font);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ns-fg);
 }
 
-.landing.night .landing-nav {
+.landing.ns .landing-nav {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 14px;
 }
 
-.landing.night .landing-link {
+.landing.ns .landing-link {
   color: var(--ns-muted);
   font-size: 14px;
   text-decoration: none;
 }
 
-.landing.night .landing-link:hover {
-  color: var(--ns-paper);
+.landing.ns .landing-link:hover {
+  color: var(--ns-fg);
+  text-decoration: none;
 }
 
-.landing.night .landing-net {
+.landing.ns .landing-net {
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ns-muted);
@@ -1611,19 +1648,43 @@ body:has(.landing.night) {
   padding: 6px 12px;
 }
 
-.landing.night .landing-net b {
+.landing.ns .landing-net b {
   color: var(--ns-live);
   font-weight: 500;
 }
 
-.landing.night .net-note {
-  margin: 0 -32px;
-  background: rgba(255, 181, 71, 0.1);
-  color: #ffb547;
-  border-bottom: 1px solid var(--ns-line);
+.landing.ns .theme-toggle,
+.landing.ns .landing-console {
+  width: auto;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 14px;
+  background: transparent;
+  color: var(--ns-fg);
+  border: 1px solid var(--ns-line);
+  filter: none;
 }
 
-.landing.night .night-hero {
+.landing.ns .theme-toggle {
+  width: 36px;
+  padding: 0;
+}
+
+.landing.ns .theme-toggle:hover,
+.landing.ns .landing-console:hover {
+  border-color: var(--ns-live);
+  background: transparent;
+  filter: none;
+}
+
+.landing.ns .theme-toggle:focus-visible,
+.landing.ns .landing-console:focus-visible,
+.landing.ns .landing-check .input:focus-visible {
+  outline: 2px solid var(--ns-live);
+  outline-offset: 2px;
+}
+
+.landing.ns .night-hero {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
   gap: 56px;
@@ -1632,7 +1693,7 @@ body:has(.landing.night) {
   text-align: left;
 }
 
-.landing.night .landing-eyebrow {
+.landing.ns .landing-eyebrow {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.14em;
@@ -1641,21 +1702,21 @@ body:has(.landing.night) {
   margin: 0;
 }
 
-.landing.night .landing-title {
+.landing.ns .landing-title {
   font-size: clamp(42px, 7vw, 72px);
   line-height: 0.98;
   letter-spacing: -0.04em;
   font-weight: 800;
   margin: 18px 0 22px;
-  color: var(--ns-paper);
+  color: var(--ns-fg);
 }
 
-.landing.night .landing-title em {
+.landing.ns .landing-title em {
   font-style: normal;
-  color: var(--ns-live);
+  color: var(--ns-title-em);
 }
 
-.landing.night .landing-sub {
+.landing.ns .landing-sub {
   font-size: 19px;
   line-height: 1.5;
   color: var(--ns-body);
@@ -1663,10 +1724,10 @@ body:has(.landing.night) {
   margin: 0;
 }
 
-.landing.night .landing-check {
+.landing.ns .landing-check {
   display: flex;
   margin-top: 34px;
-  background: var(--ns-ink-2);
+  background: var(--ns-panel);
   border: 1px solid var(--ns-line);
   border-radius: 999px;
   padding: 6px;
@@ -1674,25 +1735,25 @@ body:has(.landing.night) {
   gap: 0;
 }
 
-.landing.night .landing-check .input {
+.landing.ns .landing-check .input {
   flex: 1;
   min-width: 0;
   background: transparent;
   border: 0;
   box-shadow: none;
-  color: var(--ns-paper);
+  color: var(--ns-fg);
   font-family: var(--mono);
   font-size: 15px;
   padding: 0 18px;
   border-radius: 999px;
 }
 
-.landing.night .landing-check .input::placeholder {
+.landing.ns .landing-check .input::placeholder {
   color: var(--ns-dim);
 }
 
-.landing.night .landing-check .btn-primary,
-.landing.night .landing-check button[type="submit"] {
+.landing.ns .landing-check .btn-primary,
+.landing.ns .landing-check button[type="submit"] {
   background: var(--ns-live) !important;
   color: var(--ns-live-ink) !important;
   border-color: var(--ns-live) !important;
@@ -1701,7 +1762,14 @@ body:has(.landing.night) {
   white-space: nowrap;
 }
 
-.landing.night .landing-hint {
+.landing.ns-light .landing-check .btn-primary,
+.landing.ns-light .landing-check button[type="submit"] {
+  background: #0b0f19 !important;
+  color: #f4f6fa !important;
+  border-color: #0b0f19 !important;
+}
+
+.landing.ns .landing-hint {
   margin-top: 14px;
   font-size: 13px;
   color: var(--ns-muted);
@@ -1709,18 +1777,18 @@ body:has(.landing.night) {
   line-height: 1.45;
 }
 
-.landing.night .landing-hint code {
+.landing.ns .landing-hint code {
   font-family: var(--mono);
-  color: var(--ns-paper);
+  color: var(--ns-fg);
 }
 
-.landing.night .pass-card {
+.landing.ns .pass-card {
   position: relative;
-  background: linear-gradient(160deg, #18213a 0%, #0f1526 70%);
-  border: 1px solid #2a3550;
+  background: var(--ns-card);
+  border: 1px solid var(--ns-card-line);
   border-radius: 28px;
   padding: 28px;
-  box-shadow: 0 40px 120px rgba(198, 244, 50, 0.08), 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--ns-shadow);
   animation: pass-in 0.7s ease-out both;
 }
 
@@ -1735,17 +1803,17 @@ body:has(.landing.night) {
   }
 }
 
-.landing.night .pass-top {
+.landing.ns .pass-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.landing.night .pass-status {
+.landing.ns .pass-status {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(198, 244, 50, 0.12);
+  background: var(--ns-status-bg);
   color: var(--ns-live);
   border-radius: 999px;
   padding: 7px 12px;
@@ -1753,13 +1821,13 @@ body:has(.landing.night) {
   font-size: 13px;
 }
 
-.landing.night .dot-live {
+.landing.ns .dot-live {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--ns-live);
-  box-shadow: 0 0 0 4px rgba(198, 244, 50, 0.18);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ns-live) 25%, transparent);
   animation: ns-pulse 1.6s infinite;
   margin: 0;
   vertical-align: middle;
@@ -1767,11 +1835,11 @@ body:has(.landing.night) {
 
 @keyframes ns-pulse {
   50% {
-    box-shadow: 0 0 0 8px rgba(198, 244, 50, 0);
+    box-shadow: 0 0 0 8px transparent;
   }
 }
 
-.landing.night .pass-org {
+.landing.ns .pass-org {
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ns-muted);
@@ -1780,7 +1848,7 @@ body:has(.landing.night) {
   padding: 6px 12px;
 }
 
-.landing.night .pass-ring {
+.landing.ns .pass-ring {
   display: grid;
   place-items: center;
   margin: 26px auto 18px;
@@ -1789,64 +1857,64 @@ body:has(.landing.night) {
   position: relative;
 }
 
-.landing.night .pass-ring svg {
+.landing.ns .pass-ring svg {
   position: absolute;
   inset: 0;
 }
 
-.landing.night .pass-ring-track {
-  color: #1e2638;
+.landing.ns .pass-ring-track {
+  color: var(--ns-ring-track);
 }
 
-.landing.night .pass-ring-arc {
+.landing.ns .pass-ring-arc {
   color: var(--ns-live);
   transition: stroke-dashoffset 0.9s linear;
 }
 
-.landing.night .pass-ring-label {
+.landing.ns .pass-ring-label {
   position: relative;
   text-align: center;
   z-index: 1;
 }
 
-.landing.night .pass-time {
+.landing.ns .pass-time {
   font-family: var(--mono);
   font-size: 28px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-.landing.night .pass-time-sub {
+.landing.ns .pass-time-sub {
   font-size: 12px;
   color: var(--ns-muted);
   margin-top: 4px;
 }
 
-.landing.night .pass-name {
+.landing.ns .pass-name {
   font-size: 17px;
   text-align: center;
   word-break: break-all;
 }
 
-.landing.night .pass-name span {
+.landing.ns .pass-name span {
   color: var(--ns-muted);
 }
 
-.landing.night .pass-kv {
+.landing.ns .pass-kv {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
   margin-top: 22px;
 }
 
-.landing.night .pass-kv div {
-  background: rgba(255, 255, 255, 0.03);
+.landing.ns .pass-kv div {
+  background: var(--ns-kv);
   border: 1px solid var(--ns-line);
   border-radius: 12px;
   padding: 10px 12px;
 }
 
-.landing.night .pass-kv small {
+.landing.ns .pass-kv small {
   display: block;
   color: var(--ns-muted);
   font-size: 11px;
@@ -1855,32 +1923,32 @@ body:has(.landing.night) {
   margin-bottom: 4px;
 }
 
-.landing.night .pass-kv b {
+.landing.ns .pass-kv b {
   font-size: 15px;
   font-weight: 650;
 }
 
-.landing.night .pass-kv .bad {
+.landing.ns .pass-kv .bad {
   color: var(--ns-dead);
 }
 
-.landing.night .pass-proof {
+.landing.ns .pass-proof {
   margin-top: 16px;
   font-size: 11px;
   color: var(--ns-dim);
   text-align: center;
 }
 
-.landing.night .doors {
+.landing.ns .doors {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   margin: 0 0 48px;
 }
 
-.landing.night .door {
+.landing.ns .door {
   text-align: left;
-  background: var(--ns-ink-2);
+  background: var(--ns-panel);
   border: 1px solid var(--ns-line);
   border-radius: 18px;
   padding: 22px;
@@ -1893,25 +1961,25 @@ body:has(.landing.night) {
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
-.landing.night .door:hover {
+.landing.ns .door:hover {
   border-color: var(--ns-live);
   transform: translateY(-2px);
 }
 
-.landing.night .door-title {
+.landing.ns .door-title {
   font-size: 17px;
   font-weight: 650;
   margin-top: 6px;
 }
 
-.landing.night .door-body {
+.landing.ns .door-body {
   color: var(--ns-muted);
   font-size: 14px;
   line-height: 1.45;
   flex: 1;
 }
 
-.landing.night .door-cta {
+.landing.ns .door-cta {
   color: var(--ns-live);
   font-size: 14px;
   font-weight: 600;
@@ -1920,29 +1988,29 @@ body:has(.landing.night) {
   gap: 4px;
 }
 
-.landing.night .attacks-section {
+.landing.ns .attacks-section {
   padding: 56px 0 24px;
   border-top: 1px solid var(--ns-line);
 }
 
-.landing.night .section-title {
+.landing.ns .section-title {
   font-size: clamp(28px, 4vw, 44px);
   letter-spacing: -0.03em;
   line-height: 1.05;
   margin: 12px 0 0;
   font-weight: 800;
-  color: var(--ns-paper);
+  color: var(--ns-fg);
 }
 
-.landing.night .attacks {
+.landing.ns .attacks {
   margin-top: 36px;
   border: 1px solid var(--ns-line);
   border-radius: 18px;
   overflow: hidden;
 }
 
-.landing.night .attacks-head,
-.landing.night .attacks-row {
+.landing.ns .attacks-head,
+.landing.ns .attacks-row {
   display: grid;
   grid-template-columns: 1.2fr 1fr 0.9fr;
   padding: 16px 22px;
@@ -1951,62 +2019,67 @@ body:has(.landing.night) {
   gap: 12px;
 }
 
-.landing.night .attacks-head {
-  background: var(--ns-ink-2);
+.landing.ns .attacks-head {
+  background: var(--ns-panel);
   color: var(--ns-muted);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.landing.night .attacks-row {
+.landing.ns .attacks-row {
   border-top: 1px solid var(--ns-line);
 }
 
-.landing.night .attacks .err {
+.landing.ns .attacks .err {
   font-family: var(--mono);
   font-size: 13px;
   color: var(--ns-dead);
 }
 
-.landing.night .attacks .ok {
+.landing.ns .attacks .ok {
   font-family: var(--mono);
   font-size: 13px;
   color: var(--ns-live);
 }
 
+.theme-toggle {
+  width: 32px;
+  padding: 0;
+}
+
 @media (max-width: 900px) {
-  .landing.night {
+  .landing.ns {
     padding: 0 20px 56px;
   }
-  .landing.night .night-hero {
+  .landing.ns .night-hero {
     grid-template-columns: 1fr;
     gap: 36px;
     padding: 28px 0 48px;
   }
-  .landing.night .landing-title {
+  .landing.ns .landing-title {
     font-size: 42px;
   }
-  .landing.night .landing-check {
+  .landing.ns .landing-check {
     flex-direction: column;
     border-radius: 18px;
     padding: 10px;
   }
-  .landing.night .landing-check .input {
+  .landing.ns .landing-check .input {
     padding: 12px 14px;
   }
-  .landing.night .doors {
+  .landing.ns .doors {
     grid-template-columns: 1fr;
   }
-  .landing.night .attacks-head,
-  .landing.night .attacks-row {
+  .landing.ns .attacks-head,
+  .landing.ns .attacks-row {
     grid-template-columns: 1fr;
     gap: 6px;
   }
-  .landing.night .landing-nav .landing-link {
+  .landing.ns .landing-nav .landing-link {
     display: none;
   }
-  .landing.night .brand-word {
+  .landing.ns .landing-net {
     display: none;
   }
 }

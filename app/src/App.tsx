@@ -20,6 +20,7 @@ import { useOnShift } from "./lib/onshift";
 import { useSession } from "./lib/session";
 import { deployment, isLocal, networkLabel } from "./lib/config";
 import { short } from "./lib/format";
+import { useTheme } from "./lib/theme";
 import { Badge, NetworkNote, Toasts } from "./components/ui";
 import { Overview } from "./pages/Overview";
 import { Passes } from "./pages/Passes";
@@ -76,26 +77,10 @@ export function navigate(route: Route, params?: Record<string, string>) {
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark" | null>(() => {
-    try {
-      return (localStorage.getItem("onshift.theme") as "light" | "dark" | null) ?? null;
-    } catch {
-      return null;
-    }
-  });
-  useEffect(() => {
-    if (!theme) return;
-    document.documentElement.dataset.theme = theme;
-    try {
-      localStorage.setItem("onshift.theme", theme);
-    } catch {
-      /* ignore */
-    }
-  }, [theme]);
-  const dark = theme ? theme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const { dark, toggle } = useTheme();
   return (
-    <button className="btn" style={{ width: 32, padding: 0 }} onClick={() => setTheme(dark ? "light" : "dark")} aria-label="Switch appearance">
-      {dark ? <Sun size={15} /> : <Moon size={15} />}
+    <button className="btn theme-toggle" type="button" onClick={toggle} aria-label={dark ? "Switch to light" : "Switch to dark"}>
+      {dark ? <Sun size={15} strokeWidth={2.2} /> : <Moon size={15} strokeWidth={2.2} />}
     </button>
   );
 }

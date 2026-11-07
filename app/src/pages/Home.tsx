@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, BadgeCheck, FlaskConical, LayoutGrid, Smartphone } from "lucide-react";
-import { Button, Countdown, NetworkNote } from "../components/ui";
-import { useOnShift } from "../lib/onshift";
+import { Button, Countdown } from "../components/ui";
+import { useOnShift, useChainNow } from "../lib/onshift";
 import { deployment, networkLabel } from "../lib/config";
+import { useTheme } from "../lib/theme";
 import { ThemeToggle, navigate, type Route } from "../App";
 
 const REPO = "https://github.com/devhb1/on-shift";
+const RING = 527.8;
+const DEMO_TOTAL = 4 * 3600;
 
 const ATTACKS: { try: string; result: string; who: string; ok?: boolean }[] = [
   { try: "Send the refund to their own wallet", result: "EACUnauthorizedAccountRoles", who: "Permissioned Resolver" },
@@ -32,31 +35,38 @@ function formatLeft(secs: number) {
 
 export function Home() {
   const { snapshot } = useOnShift();
+  const { dark } = useTheme();
+  const now = useChainNow();
   const d = deployment;
   const [name, setName] = useState("");
   const live = snapshot?.passes.filter((p) => p.state === "live") ?? [];
   const example = live[0];
   const exampleRole = example && snapshot ? snapshot.presets[example.presetId]?.name ?? "Cashier" : "Cashier";
   const [demoLeft, setDemoLeft] = useState(3 * 3600 + 41 * 60 + 12);
-  const total = 4 * 3600;
 
   useEffect(() => {
+    if (example) return;
     const id = setInterval(() => setDemoLeft((n) => Math.max(0, n - 1)), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [example]);
 
   const check = (value: string) => navigate("verify", value ? { name: value } : undefined);
-  const ringOffset = 527.8 * (1 - demoLeft / total);
   const org = d?.orgName ?? "onshift.eth";
   const placeholder = example?.name ?? `shift-0412.ops.${org}`;
 
+  let ringOffset = RING * (1 - demoLeft / DEMO_TOTAL);
+  if (example) {
+    const span = Math.max(1, example.expiry - example.issuedAt);
+    const left = Math.max(0, example.expiry - now);
+    ringOffset = RING * (1 - left / span);
+  }
+
   return (
-    <div className="landing night">
-      <NetworkNote compact />
+    <div className={`landing ns ${dark ? "ns-dark" : "ns-light"}`}>
       <header className="landing-bar">
         <a className="app-mark" href="#/home" aria-label="OnShift home">
           <img src="/brand/onshift-mark.svg" width={34} height={34} alt="" />
-          <img className="brand-word" src="/brand/onshift-wordmark.svg" height={22} alt="OnShift" />
+          <span className="brand-word">OnShift</span>
         </a>
         <div className="row landing-nav">
           <a className="landing-link" href="#attacks">
@@ -69,7 +79,7 @@ export function Home() {
             <b>●</b> {networkLabel} · ENSv2
           </span>
           <ThemeToggle />
-          <Button icon={LayoutGrid} onClick={() => navigate("overview")}>
+          <Button className="landing-console" icon={LayoutGrid} onClick={() => navigate("overview")}>
             Console
           </Button>
         </div>
@@ -125,8 +135,8 @@ export function Home() {
                 stroke="currentColor"
                 strokeWidth="10"
                 strokeLinecap="round"
-                strokeDasharray="527.8"
-                strokeDashoffset={example ? undefined : ringOffset}
+                strokeDasharray={RING}
+                strokeDashoffset={ringOffset}
                 transform="rotate(-90 95 95)"
                 className="pass-ring-arc"
               />
