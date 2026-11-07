@@ -1230,6 +1230,128 @@ textarea.input {
   padding: 14px 0 18px;
 }
 
+.play-shell {
+  width: min(1040px, 100%);
+  margin: 0 auto;
+  padding: 0 20px 24px;
+}
+
+.play-shell > .net-note {
+  margin: 0 -20px;
+}
+
+.play-head {
+  margin: -6px 0 14px;
+}
+
+.play-head .large-title {
+  font-size: 28px;
+}
+
+.play-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.play-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.play-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 14px 16px 16px;
+}
+
+.play-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--secondary);
+  margin: 2px 0 8px;
+}
+
+.play-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.play-choice {
+  text-align: left;
+  border: 1px solid var(--separator);
+  background: var(--surface-2);
+  color: var(--label);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.play-choice.on {
+  border-color: var(--blue);
+  background: var(--blue-tint);
+}
+
+.play-choice-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.play-choice-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.play-split {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.play-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.play-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.play-steps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--label);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+@media (max-width: 860px) {
+  .play-grid,
+  .play-split,
+  .play-choices {
+    grid-template-columns: 1fr;
+  }
+}
+
 .ring-wrap {
   position: relative;
   width: 160px;

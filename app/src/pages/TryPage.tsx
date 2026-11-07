@@ -9,6 +9,7 @@ import { publicClient } from "../lib/clients";
 import { deployment, GAS_DRIP_WEI, isLocal } from "../lib/config";
 import { sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { playgroundAbi } from "../generated/abis";
+import { passPreset } from "./shared";
 import { ThemeToggle, navigate } from "../App";
 
 const MAX_CAP = 5;
@@ -113,146 +114,165 @@ export function TryPage() {
   const revoke = (label: string) =>
     run("revoke", () => send(operator!.signer, { address: d.playground!, abi: playgroundAbi, functionName: "revoke", args: [label] }), "Pass ended", `${label}${demoSuffix} no longer verifies.`);
 
+  const issuedName = justIssued ? `${justIssued}${demoSuffix}` : undefined;
+  const canIssue = busy === null && capOk && triesLeft !== 0 && (holderChoice === "new" || isAddress(pasted));
+
   return (
     <Shell>
-      <div style={{ textAlign: "center", padding: "12px 0 0" }}>
-        <h1 className="large-title">Try OnShift</h1>
-        <p className="page-sub">
-          Mint a sandbox pass under demo.{d.orgName}. It never looks like real staff and cannot touch the production till. Up to an hour, up to ${MAX_CAP}.
-        </p>
+      <div className="play-head">
+        <div>
+          <h1 className="large-title">Try OnShift</h1>
+          <p className="page-sub">A sandbox name under demo.{d.orgName}. It cannot touch the production till. Up to an hour, up to ${MAX_CAP}.</p>
+        </div>
       </div>
 
-      {!me ? (
-        <Group pad>
-          <div className="stack-sm" style={{ textAlign: "center" }}>
-            <p className="secondary small">Connect a wallet with a little Sepolia ETH.</p>
-            <Button variant="primary" icon={Wallet} onClick={() => connectWallet()}>
-              Connect Wallet
-            </Button>
-          </div>
-        </Group>
-      ) : (
-        <>
-          <Group title="1. Role">
-            {presets.map((p) => (
-              <Row
-                key={p.id}
-                icon={p.agent ? FlaskConical : p.maxCap === 0n ? BadgeCheck : CreditCard}
-                tint={presetId === p.id ? "blue" : "soft"}
-                title={p.name}
-                subtitle={p.maxCap === 0n ? "Checks tickets. Cannot move money." : `Refunds paid orders, up to $${MAX_CAP} here`}
-                selected={presetId === p.id}
-                onClick={() => setPresetId(p.id)}
-              />
-            ))}
-          </Group>
+      <div className="play-grid">
+          <div className="play-card">
+            {!me ? (
+              <div className="stack-sm" style={{ textAlign: "center", padding: "8px 0" }}>
+                <p className="secondary small">Connect a wallet with a little Sepolia ETH. About 0.005 covers gas and the holder's allowance.</p>
+                <Button variant="primary" icon={Wallet} onClick={() => connectWallet()}>
+                  Connect Wallet
+                </Button>
+              </div>
+            ) : (
+              <>
+            <div className="play-label">Role</div>
+            <div className="play-choices">
+              {presets.map((p) => (
+                <button key={p.id} type="button" className={`play-choice ${presetId === p.id ? "on" : ""}`} onClick={() => setPresetId(p.id)}>
+                  <span className="play-choice-title">{p.agent ? <FlaskConical size={14} /> : <CreditCard size={14} />} {p.name}</span>
+                  <span className="play-choice-sub">Refunds on the sandbox till, up to ${MAX_CAP}</span>
+                </button>
+              ))}
+            </div>
 
-          <Group title="2. Limits" pad>
-            <Field label="Shift length">
-              <Segmented value={seconds} options={DURATIONS} onChange={setSeconds} block />
-            </Field>
-            {preset && preset.maxCap > 0n && (
-              <Field label="Refund cap" hint={capOk ? undefined : `Between 0 and ${MAX_CAP} test USDC.`}>
+            <div className="play-split">
+              <Field label="Shift length">
+                <Segmented value={seconds} options={DURATIONS} onChange={setSeconds} block />
+              </Field>
+              <Field label="Refund cap" hint={capOk ? undefined : `0 to ${MAX_CAP}`}>
                 <div className="affix">
                   <input className="input" inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value.replace(/[^0-9.]/g, ""))} />
                   <span className="suffix">test USDC</span>
                 </div>
               </Field>
+            </div>
+
+            <div className="play-label">Who holds it</div>
+            <div className="play-choices">
+              <button type="button" className={`play-choice ${holderChoice === "new" ? "on" : ""}`} onClick={() => setHolderChoice("new")}>
+                <span className="play-choice-title"><Smartphone size={14} /> This browser</span>
+                <span className="play-choice-sub">New key, then the staff app</span>
+              </button>
+              <button type="button" className={`play-choice ${holderChoice === "paste" ? "on" : ""}`} onClick={() => setHolderChoice("paste")}>
+                <span className="play-choice-title"><Wallet size={14} /> Another wallet</span>
+                <span className="play-choice-sub">Paste a device code</span>
+              </button>
+            </div>
+            {holderChoice === "paste" && (
+              <Field label="Holder address">
+                <input className="input mono" placeholder="0x…" value={pasted} onChange={(e) => setPasted(e.target.value.trim())} />
+              </Field>
             )}
-          </Group>
 
-          <Group title="3. Who gets it">
-            <Row icon={Smartphone} tint={holderChoice === "new" ? "blue" : "soft"} title="A new device in this browser" subtitle="Creates a key here, then opens the staff app" selected={holderChoice === "new"} onClick={() => setHolderChoice("new")} />
-            <Row icon={Wallet} tint={holderChoice === "paste" ? "blue" : "soft"} title="Another wallet" subtitle="Paste an address, e.g. a second phone's device code" selected={holderChoice === "paste"} onClick={() => setHolderChoice("paste")} />
-          </Group>
-          {holderChoice === "paste" && (
-            <Field label="Holder address">
-              <input className="input mono" placeholder="0x…" value={pasted} onChange={(e) => setPasted(e.target.value.trim())} />
-            </Field>
-          )}
+            <Button block size="lg" variant="primary" loading={busy === "try"} disabled={!canIssue} onClick={issue}>
+              Issue Pass
+            </Button>
+            <p className="small secondary" style={{ textAlign: "center", margin: "8px 0 0" }}>
+              {triesLeft === undefined ? "" : `${triesLeft} of ${MAX_PER_DAY} left today. `}Sends 0.003 Sepolia ETH to the holder for gas.
+            </p>
+              </>
+            )}
+          </div>
 
-          <Button block size="lg" variant="primary" loading={busy === "try"} disabled={busy !== null || !capOk || triesLeft === 0 || (holderChoice === "paste" && !isAddress(pasted))} onClick={issue}>
-            Issue Pass
-          </Button>
-          <p className="small secondary" style={{ textAlign: "center", marginTop: -8 }}>
-            {triesLeft === undefined ? "" : `${triesLeft} of ${MAX_PER_DAY} left today. `}Sends 0.003 Sepolia ETH to the holder for gas.
-          </p>
-
-          {justIssued && (
-            <Group pad>
-              <div className="stack-sm" style={{ textAlign: "center" }}>
-                <div style={{ fontWeight: 700 }}>{justIssued}{demoSuffix} is live (demo)</div>
-                <div className="row" style={{ justifyContent: "center", flexWrap: "wrap" }}>
-                  <Button variant="primary" icon={Smartphone} onClick={() => navigate("device")}>
-                    Open Staff App
-                  </Button>
-                  <Button icon={CreditCard} onClick={() => navigate("pay")}>
-                    Pay as a Customer
-                  </Button>
-                  <Button icon={BadgeCheck} onClick={() => navigate("verify", { name: `${justIssued}.ops.${d.orgName}` })}>
-                    Check It Publicly
-                  </Button>
+          <div className="play-side">
+            <div className="play-card">
+              {issuedName ? (
+                <div className="stack-sm">
+                  <div className="play-label">Just issued</div>
+                  <div className="play-name">{issuedName}</div>
+                  <div className="small secondary">Sandbox only. Public Check should say demo, not staff.</div>
+                  <div className="play-actions">
+                    <Button variant="primary" icon={CreditCard} onClick={() => navigate("pay", { demo: "1" })}>
+                      Pay sandbox
+                    </Button>
+                    <Button icon={Smartphone} onClick={() => navigate("device")}>
+                      Staff app
+                    </Button>
+                    <Button icon={BadgeCheck} onClick={() => navigate("verify", { name: issuedName })}>
+                      Public check
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Group>
-          )}
+              ) : (
+                <div className="stack-sm">
+                  <div className="play-label">The loop, on one screen</div>
+                  <ol className="play-steps">
+                    <li>Issue a demo pass. The name ends in demo.{d.orgName}.</li>
+                    <li>Pay the sandbox till. That order is not a production payment.</li>
+                    <li>Refund it from the staff app. The money can only return to the payer.</li>
+                    <li>Public Check reads the same name. A look-alike org is flagged.</li>
+                  </ol>
+                </div>
+              )}
+            </div>
 
-          {mine.length > 0 && (
-            <Group title="Your Playground passes">
-              {mine.slice(0, 6).map((p) => (
-                <Row
-                  key={p.index}
-                  title={p.name}
-                  subtitle={
-                    <span>
-                      {s.presets[p.presetId]?.name} · held by {short(p.holder)}
-                      {p.state === "live" && (
-                        <>
-                          {" · "}
-                          <Countdown expiry={p.expiry} />
-                        </>
-                      )}
-                      {p.cap > 0n && ` · ${usdc(p.spent)} of ${usdc(p.cap)} used`}
-                    </span>
-                  }
-                  trailing={
-                    p.state === "live" ? (
-                      <Button variant="plain danger" icon={XOctagon} disabled={busy !== null} onClick={() => revoke(p.label)}>
-                        End
-                      </Button>
-                    ) : (
-                      <StateBadge state={p.state} />
-                    )
-                  }
-                  plain
-                />
-              ))}
-            </Group>
-          )}
-        </>
-      )}
+            {mine.length > 0 && (
+              <Group title="Your sandbox passes">
+                {mine.slice(0, 4).map((p) => (
+                  <Row
+                    key={p.index}
+                    title={p.name}
+                    subtitle={
+                      <span>
+                        {passPreset(s, p)?.name ?? "Demo"} · {short(p.holder)}
+                        {p.state === "live" && (
+                          <>
+                            {" · "}
+                            <Countdown expiry={p.expiry} />
+                          </>
+                        )}
+                        {p.cap > 0n && ` · ${usdc(p.spent)} of ${usdc(p.cap)}`}
+                      </span>
+                    }
+                    trailing={
+                      p.state === "live" ? (
+                        <Button variant="plain danger" icon={XOctagon} disabled={busy !== null} onClick={() => revoke(p.label)}>
+                          End
+                        </Button>
+                      ) : (
+                        <StateBadge state={p.state} />
+                      )
+                    }
+                    onClick={() => navigate("verify", { name: p.name })}
+                    plain
+                  />
+                ))}
+              </Group>
+            )}
+          </div>
+        </div>
     </Shell>
   );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="device-shell">
+    <div className="play-shell">
       <NetworkNote compact />
-      <div className="device">
-        <div className="device-bar">
-          <span className="btn" style={{ pointerEvents: "none" }}>
-            <FlaskConical size={15} /> Playground
-          </span>
-          <div className="row">
-            <ThemeToggle />
-            <Button variant="plain" onClick={() => navigate("home")}>
-              Home
-            </Button>
-          </div>
+      <div className="device-bar">
+        <span className="btn" style={{ pointerEvents: "none" }}>
+          <FlaskConical size={15} /> Playground
+        </span>
+        <div className="row">
+          <ThemeToggle />
+          <Button variant="plain" onClick={() => navigate("home")}>
+            Home
+          </Button>
         </div>
-        <div className="stack" style={{ gap: 18 }}>{children}</div>
       </div>
+      {children}
     </div>
   );
 }

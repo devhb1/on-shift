@@ -5,7 +5,7 @@ import { useSession } from "../lib/session";
 import { deployment, isLocal } from "../lib/config";
 import { clock, plural, sameAddress, timeAgo, usdc } from "../lib/format";
 import { navigate } from "../App";
-import { ACTIVITY_LOOK, roleLook, whoIs } from "./shared";
+import { ACTIVITY_LOOK, passPreset, roleLook, whoIs } from "./shared";
 
 export function Overview() {
   const { snapshot } = useOnShift();
@@ -14,11 +14,13 @@ export function Overview() {
   const s = snapshot!;
   const d = deployment!;
 
-  const live = s.passes.filter((p) => p.state === "live").sort((a, b) => a.expiry - b.expiry);
+  const staff = s.passes.filter((p) => !p.sandbox);
+  const live = staff.filter((p) => p.state === "live").sort((a, b) => a.expiry - b.expiry);
+  const sandboxLive = s.passes.filter((p) => p.sandbox && p.state === "live").length;
   const endingSoon = live.filter((p) => p.expiry - now <= 15 * 60);
   const nearCap = live.filter((p) => p.cap > 0n && p.spent * 10n >= p.cap * 8n);
   const startOfDay = new Date(new Date(now * 1000).toDateString()).getTime() / 1000;
-  const today = s.passes.filter((p) => p.issuedAt >= startOfDay);
+  const today = staff.filter((p) => p.issuedAt >= startOfDay);
   const spentToday = today.reduce((sum, p) => sum + p.spent, 0n);
   const lead = s.leads.find((l) => operator && sameAddress(l.address, operator.signer.address));
 
@@ -96,14 +98,15 @@ export function Overview() {
               </Empty>
             ) : (
               live.slice(0, 6).map((p) => {
-                const look = roleLook(s.presets[p.presetId]);
+                const preset = passPreset(s, p);
+                const look = roleLook(preset);
                 return (
                   <Row
                     key={p.index}
                     icon={look.icon}
                     tint={look.tint}
                     title={p.label}
-                    subtitle={`${whoIs(p.holder, s, devices, d.org)} · ${p.shiftStatus || s.presets[p.presetId]?.name}`}
+                    subtitle={`${whoIs(p.holder, s, devices, d.org)} · ${p.shiftStatus || preset?.name}`}
                     trailing={
                       <div style={{ minWidth: 74 }}>
                         <Countdown expiry={p.expiry} />
@@ -150,7 +153,11 @@ export function Overview() {
               </Group>
             )}
 
-            <Group title="Recent Activity" action={<a href="#/activity">See All</a>}>
+            <Group
+              title="Recent Activity"
+              action={<a href="#/activity">See All</a>}
+              footer={sandboxLive > 0 ? `${sandboxLive} live in Playground, under demo.${d.orgName}. Those are not staff.` : undefined}
+            >
               {s.activity.filter((a) => a.kind !== "lead").length === 0 ? (
                 <Empty icon={Clock3} title="Nothing yet" />
               ) : (

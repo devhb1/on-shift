@@ -17,6 +17,7 @@ import {
 import { Button, CopyButton, Empty, Field, Group, Meter, NetworkNote, Qr, Row, Sheet } from "../components/ui";
 import { PassCard } from "../components/PassCard";
 import { labelId, passNode, useOnShift, type PassRow } from "../lib/onshift";
+import { passPreset } from "./shared";
 import { useSession } from "../lib/session";
 import { send, simulate } from "../lib/tx";
 import { explain } from "../lib/errors";
@@ -159,7 +160,8 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
   const { run, busy } = useSession();
   const s = snapshot!;
   const d = deployment!;
-  const preset = s.presets[pass.presetId];
+  const preset = passPreset(s, pass);
+  const gate = pass.sandbox && d.sandboxGate ? d.sandboxGate : d.shiftGate;
   const live = pass.state === "live";
   const canRefund = (preset?.actions & ACTION_REFUND) !== 0;
   const canCheckIn = (preset?.actions & ACTION_CHECK_IN) !== 0;
@@ -172,10 +174,10 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
   const [status, setStatus] = useState("");
   const [probes, setProbes] = useState<Record<string, Probe>>({});
 
-  const node = async () => passNode(pass.label);
-  const openOrders = s.orders.filter((o) => o.paid > o.refunded);
+  const node = () => passNode(pass.label, pass.sandbox ? "demo" : "ops");
+  const openOrders = s.orders.filter((o) => sameAddress(o.gate, gate) && o.paid > o.refunded);
   const codeOk = isHex(orderCode) && orderCode.length === 66;
-  const order = codeOk ? s.orders.find((o) => o.orderId.toLowerCase() === orderCode.toLowerCase()) : undefined;
+  const order = codeOk ? s.orders.find((o) => sameAddress(o.gate, gate) && o.orderId.toLowerCase() === orderCode.toLowerCase()) : undefined;
   const amountUnits = (() => {
     try {
       return toUsdcUnits(amount);
@@ -183,21 +185,21 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
       return 0n;
     }
   })();
-  const bigOrder = s.orders.find((o) => o.paid - o.refunded > remaining);
+  const bigOrder = s.orders.find((o) => sameAddress(o.gate, gate) && o.paid - o.refunded > remaining);
 
   const act = async (key: "refund" | "checkin" | "status") => {
     setSheet(null);
     if (key === "refund")
       await run(
         "refund",
-        () => send(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, orderCode as Hex, amountUnits] }),
+        () => send(device.signer, { address: gate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, orderCode as Hex, amountUnits] }),
         `Refunded ${usdc(amountUnits)}`,
         "Sent back to the wallet that paid the order.",
       );
     if (key === "checkin")
       await run(
         "checkin",
-        () => send(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "checkIn", args: [pass.label, keccak256(toHex(ticket))] }),
+        () => send(device.signer, { address: gate, abi: shiftGateAbi, functionName: "checkIn", args: [pass.label, keccak256(toHex(ticket))] }),
         "Checked in",
         ticket,
       );
@@ -244,7 +246,7 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
           {
             key: "self",
             label: "Refund money to my own wallet",
-            run: () => simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
+            run: () => simulate(device.signer, { address: gate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
           },
         ]
       : []),
@@ -253,7 +255,7 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
           {
             key: "over",
             label: `Refund ${usdc(remaining + 1_000_000n)} — over my limit`,
-            run: () => simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, bigOrder.orderId, remaining + 1_000_000n] }),
+            run: () => simulate(device.signer, { address: gate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, bigOrder.orderId, remaining + 1_000_000n] }),
           },
         ]
       : []),
@@ -302,7 +304,7 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
             <Button
               onClick={() =>
                 probe("late", "Refund after the shift", () =>
-                  simulate(device.signer, { address: d.shiftGate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
+                  simulate(device.signer, { address: gate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
                 )
               }
             >

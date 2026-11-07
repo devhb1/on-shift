@@ -127,7 +127,7 @@ function AccountControl() {
 
 function ConsoleLayout({ route, children }: { route: Route; children: ReactNode }) {
   const { snapshot, error } = useOnShift();
-  const live = snapshot?.passes.filter((p) => p.state === "live").length ?? 0;
+  const live = snapshot?.passes.filter((p) => p.state === "live" && !p.sandbox).length ?? 0;
   return (
     <div className="console">
       <aside className="sidebar">
@@ -226,7 +226,7 @@ export function App() {
   if (route === "pay" || route === "try") {
     return (
       <>
-        {notReady ? <Setup error={error} /> : !snapshot ? loading : route === "pay" ? <PayPage /> : <TryPage />}
+        {notReady ? <Setup error={error} /> : !snapshot ? loading : route === "pay" ? <PayPage demo={params.get("demo") === "1"} /> : <TryPage />}
         <Toasts />
       </>
     );

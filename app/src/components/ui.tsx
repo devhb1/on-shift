@@ -301,7 +301,7 @@ export function Toasts() {
           <div>
             <div className="toast-title">{t.title}</div>
             {t.detail && <div className="toast-detail">{t.detail}</div>}
-            {t.href && <div className="toast-detail">View on Etherscan ↗</div>}
+            {t.href && <div className="toast-detail">Confirmed on Sepolia. Etherscan can take a few seconds to leave Pending. ↗</div>}
           </div>
         </div>
       ))}

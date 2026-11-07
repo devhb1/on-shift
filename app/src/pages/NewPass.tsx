@@ -132,6 +132,7 @@ export function NewPass() {
         state: "live",
         shiftStatus: "Starting shift",
         isLatestForLabel: true,
+        sandbox: false,
       });
       setStep(4);
     }

@@ -14,7 +14,7 @@ import { ThemeToggle, navigate } from "../App";
 const unit = isLocal ? "USDC" : "test USDC";
 
 /** The customer side: pay the shop, get an order code, and see refunds land in the same wallet. */
-export function PayPage() {
+export function PayPage({ demo = false }: { demo?: boolean }) {
   const { snapshot } = useOnShift();
   const { operator, connectWallet, run, busy } = useSession();
   const d = deployment!;
@@ -24,7 +24,8 @@ export function PayPage() {
   const [latest, setLatest] = useState<`0x${string}`>();
   const [till, setTill] = useState<TillView>();
 
-  const mine: Order[] = (snapshot?.orders ?? []).filter((o) => sameAddress(o.payer, me));
+  const gateAddress = demo && d.sandboxGate ? d.sandboxGate : undefined;
+  const mine: Order[] = (snapshot?.orders ?? []).filter((o) => sameAddress(o.payer, me) && (gateAddress ? sameAddress(o.gate, gateAddress) : !d.sandboxGate || !sameAddress(o.gate, d.sandboxGate)));
   const shown = latest ? mine.find((o) => o.orderId === latest) : undefined;
 
   useEffect(() => {
@@ -69,9 +70,9 @@ export function PayPage() {
     await run(
       "pay",
       async () => {
-        const view = till ?? (await resolveTill());
-        if (view.quarantined) throw new Error("Till is quarantined");
-        const gate = view.gate;
+        const view = demo ? undefined : till ?? (await resolveTill());
+        if (view?.quarantined) throw new Error("Till is quarantined");
+        const gate = demo && d.sandboxGate ? d.sandboxGate : view!.gate;
         const allowance = await publicClient.readContract({ address: d.usdc, abi: mockUSDCAbi, functionName: "allowance", args: [me, gate] });
         if (allowance < units) await send(operator.signer, { address: d.usdc, abi: mockUSDCAbi, functionName: "approve", args: [gate, units] });
         const receipt = await send(operator.signer, { address: gate, abi: shiftGateAbi, functionName: "pay", args: [units] });
@@ -80,7 +81,7 @@ export function PayPage() {
         return receipt;
       },
       `Paid ${usdc(units)}`,
-      "Show the order code to the cashier for a refund.",
+      demo ? "This order is on the sandbox till. Only a demo pass can refund it, and only back to this wallet." : "Show the order code to the cashier for a refund.",
     );
   };
 
@@ -102,8 +103,12 @@ export function PayPage() {
 
         <div className="stack" style={{ gap: 18 }}>
           <div style={{ textAlign: "center", padding: "12px 0 0" }}>
-            <h1 className="large-title">Pay {d.orgName}</h1>
-            <p className="page-sub">Your payment is an order on chain. A refund can only ever come back to this wallet, and never more than you paid.</p>
+            <h1 className="large-title">{demo ? "Pay the sandbox" : `Pay ${d.orgName}`}</h1>
+            <p className="page-sub">
+              {demo
+                ? "This till is only for Playground passes under demo.onshift.eth. A refund can only come back to this wallet."
+                : "Your payment is an order on chain. A refund can only ever come back to this wallet, and never more than you paid."}
+            </p>
           </div>
 
           {!me ? (

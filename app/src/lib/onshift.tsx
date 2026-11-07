@@ -33,6 +33,8 @@ export type PassRow = {
   state: PassState;
   shiftStatus: string;
   isLatestForLabel: boolean;
+  /** Playground pass under demo.<org>. It is not staff of the production ops registry. */
+  sandbox: boolean;
   /** The wallet that asked the Playground for this pass, if it came from there. */
   requester?: Address;
 };
@@ -45,6 +47,8 @@ export type Order = {
   blockNumber: bigint;
   ts: number;
   txHash: string;
+  /** The ShiftGate that holds this order. Sandbox orders are not the production till. */
+  gate: Address;
 };
 
 export type ActivityItem = {
@@ -73,6 +77,7 @@ export type Snapshot = {
   epoch: number;
   gateFloat: bigint;
   presets: Preset[];
+  demoPresets: Preset[];
   passes: PassRow[];
   activity: ActivityItem[];
   leads: Lead[];
@@ -123,6 +128,7 @@ type EventCache = {
   tip: bigint;
   issuer: IssuerLog[];
   gate: GateLog[];
+  sandbox: GateLog[];
   sw: SwitchLog[];
   pg: PlaygroundLog[];
 };
@@ -136,6 +142,10 @@ const pullSwitch = (from: bigint, to: bigint) =>
 const pullPlayground = (from: bigint, to: bigint) =>
   deployment!.playground
     ? publicClient.getContractEvents({ address: deployment!.playground, abi: playgroundAbi, fromBlock: from, toBlock: to })
+    : Promise.resolve([]);
+const pullSandbox = (from: bigint, to: bigint) =>
+  deployment!.sandboxGate
+    ? publicClient.getContractEvents({ address: deployment!.sandboxGate, abi: shiftGateAbi, fromBlock: from, toBlock: to })
     : Promise.resolve([]);
 
 function isRangeError(error: unknown) {
@@ -173,6 +183,7 @@ async function syncLogs(cache: EventCache, toBlock: bigint) {
     cache.tip = -1n;
     cache.issuer = [];
     cache.gate = [];
+    cache.sandbox = [];
     cache.sw = [];
     cache.pg = [];
   }
@@ -180,14 +191,16 @@ async function syncLogs(cache: EventCache, toBlock: bigint) {
   if (from > toBlock) return;
   // The gate and the Playground were deployed after the issuer: don't page through blocks before them.
   const after = (block?: number) => (block && BigInt(block) > from ? BigInt(block) : from);
-  const [issuer, gate, sw, pg] = await Promise.all([
+  const [issuer, gate, sandbox, sw, pg] = await Promise.all([
     collect(from, toBlock, pullIssuer),
     collect(after(deployment!.gateStartBlock), toBlock, pullGate),
+    collect(after(deployment!.gateStartBlock), toBlock, pullSandbox),
     collect(from, toBlock, pullSwitch),
     collect(after(deployment!.gateStartBlock), toBlock, pullPlayground),
   ]);
   cache.issuer = mergeLogs(cache.issuer, issuer);
   cache.gate = mergeLogs(cache.gate, gate);
+  cache.sandbox = mergeLogs(cache.sandbox, sandbox);
   cache.sw = mergeLogs(cache.sw, sw);
   cache.pg = mergeLogs(cache.pg, pg);
   cache.tip = toBlock;
@@ -264,12 +277,48 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     active: p.active,
   }));
 
+  let demoPresets: Preset[] = [
+    { id: 0, name: "Demo cashier", maxCap: 5_000_000n, maxDuration: 3600, actions: 3, agent: false, active: true },
+    { id: 1, name: "Demo agent", maxCap: 5_000_000n, maxDuration: 3600, actions: 1, agent: true, active: true },
+  ];
+  try {
+    const demoCount = Number(await publicClient.readContract({ address: d.passIssuer, abi: passIssuerAbi, functionName: "demoPresetCount" }));
+    if (demoCount > 0) {
+      const demoRows = await batched<{ name: string; maxCap: bigint; maxDuration: bigint; actions: number; agent: boolean; active: boolean }>(
+        Array.from({ length: demoCount }, (_, id) => ({
+          address: d.passIssuer,
+          abi: passIssuerAbi,
+          functionName: "getDemoPreset",
+          args: [id],
+        })),
+      );
+      demoPresets = demoRows.map((p, id) => ({
+        id,
+        name: p.name,
+        maxCap: p.maxCap,
+        maxDuration: Number(p.maxDuration),
+        actions: p.actions,
+        agent: p.agent,
+        active: p.active,
+      }));
+    }
+  } catch {
+    /* issuers from before the sandbox presets keep the two known demo roles */
+  }
+
+  const isSandbox = (p: RawPass) =>
+    (d.demoRegistry ? sameAddress(p.registry, d.demoRegistry) : false) ||
+    (d.playground ? sameAddress(p.issuer, d.playground) : false) ||
+    p.label.startsWith("play-");
+  const gateFor = (p: RawPass) => (isSandbox(p) && d.sandboxGate ? d.sandboxGate : d.shiftGate);
+
   // Pass records are immutable once issued: fetch each index once (reset if the chain was restarted).
   if (passCache.size > Number(passCount)) {
     passCache.clear();
     events.tip = -1n;
     events.issuer = [];
     events.gate = [];
+    events.sandbox = [];
     events.sw = [];
     events.pg = [];
   }
@@ -292,31 +341,35 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
   const latestByLabel = new Map<string, number>();
   for (const [i, p] of raws) latestByLabel.set(p.label, i);
 
-  const shiftKeys = raws.map(([, p]) =>
-    keccak256(encodeAbiParameters([{ type: "address" }, { type: "uint256" }, { type: "uint64" }], [p.registry, labelId(p.label), p.expiry])),
-  );
   const spentValues = await batched<bigint>(
-    shiftKeys.map((shiftKey) => ({ address: d.shiftGate, abi: shiftGateAbi, functionName: "spent", args: [shiftKey] })),
+    raws.map(([, p]) => ({
+      address: gateFor(p),
+      abi: shiftGateAbi,
+      functionName: "spent",
+      args: [keccak256(encodeAbiParameters([{ type: "address" }, { type: "uint256" }, { type: "uint64" }], [p.registry, labelId(p.label), p.expiry]))],
+    })),
   );
   const liveCandidates = raws
     .map(([index, p], i) => ({ index, p, i }))
     .filter(({ index, p }) => {
       const expired = blockTs >= Number(p.expiry);
-      return !revoked.has(index) && latestByLabel.get(p.label) === index && !expired && sameAddress(p.registry, currentOps);
+      if (revoked.has(index) || latestByLabel.get(p.label) !== index || expired) return false;
+      return isSandbox(p) || sameAddress(p.registry, currentOps);
     });
   const statuses = await batched<{ live: boolean; shiftStatus: string }>(
-    liveCandidates.map(({ p }) => ({ address: d.shiftGate, abi: shiftGateAbi, functionName: "passStatus", args: [p.label] })),
+    liveCandidates.map(({ p }) => ({ address: gateFor(p), abi: shiftGateAbi, functionName: "passStatus", args: [p.label] })),
   );
   const statusByIndex = new Map(liveCandidates.map(({ index }, n) => [index, statuses[n]]));
 
   const passes: PassRow[] = raws.map(([index, p], i) => {
+    const sandbox = isSandbox(p);
     const isLatestForLabel = latestByLabel.get(p.label) === index;
     const expired = blockTs >= Number(p.expiry);
     let state: PassState;
     let shiftStatus = "";
     if (revoked.has(index)) state = "revoked";
     else if (!isLatestForLabel || expired) state = "expired";
-    else if (!sameAddress(p.registry, currentOps)) state = "killed";
+    else if (!sandbox && !sameAddress(p.registry, currentOps)) state = "killed";
     else {
       const st = statusByIndex.get(index);
       state = st?.live ? "live" : "revoked";
@@ -325,7 +378,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     return {
       index,
       label: p.label,
-      name: `${p.label}.ops.${d.orgName}`,
+      name: `${p.label}.${sandbox ? "demo" : "ops"}.${d.orgName}`,
       holder: p.holder,
       issuer: p.issuer,
       resolver: p.resolver,
@@ -338,7 +391,8 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
       state,
       shiftStatus,
       isLatestForLabel,
-      requester: sameAddress(p.issuer, d.playground) ? requesterByLabel.get(p.label) : undefined,
+      sandbox,
+      requester: sandbox ? requesterByLabel.get(p.label) : undefined,
     };
   });
 
@@ -360,33 +414,45 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
   }));
 
   // Activity feed with block timestamps. New blocks only; a handful at a time so a public RPC isn't flooded.
-  const all = [...issuerLogs, ...gateLogs, ...switchLogs];
+  const all = [...issuerLogs, ...gateLogs, ...events.sandbox, ...switchLogs];
   const unseenBlocks = [...new Set(all.map((l) => l.blockNumber))].filter((n) => !blockTimes.has(n));
   for (let i = 0; i < unseenBlocks.length; i += 8) {
     const slice = unseenBlocks.slice(i, i + 8);
     const stamps = await Promise.all(slice.map(async (n) => Number((await publicClient.getBlock({ blockNumber: n })).timestamp)));
     slice.forEach((n, j) => blockTimes.set(n, stamps[j]));
   }
-  const presetName = (id: number) => presets[id]?.name ?? "Pass";
+  const passName = (label: string, sandbox: boolean) => `${label}.${sandbox ? "demo" : "ops"}.${d.orgName}`;
+  const issuedSandbox = (label: string | undefined, issuer: Address | undefined) =>
+    (label?.startsWith("play-") ?? false) || (issuer !== undefined && d.playground !== undefined && sameAddress(issuer, d.playground));
   const activity: ActivityItem[] = [];
   for (const log of all) {
     const base = { key: `${log.transactionHash}-${log.logIndex}`, ts: blockTimes.get(log.blockNumber) ?? 0, blockNumber: log.blockNumber, txHash: log.transactionHash, label: "label" in log.args ? (log.args.label as string) : undefined };
+    const onSandboxGate = d.sandboxGate !== undefined && sameAddress(log.address, d.sandboxGate);
     switch (log.eventName) {
-      case "PassIssued":
-        activity.push({ ...base, kind: "issued", title: `${presetName(log.args.presetId!)} pass issued`, detail: `${log.args.label}.ops.${d.orgName}` });
+      case "PassIssued": {
+        const sandbox = issuedSandbox(log.args.label, log.args.issuer);
+        const role = (sandbox ? demoPresets : presets)[Number(log.args.presetId)]?.name ?? "Pass";
+        activity.push({ ...base, kind: "issued", title: sandbox ? `${role} sandbox pass` : `${role} pass issued`, detail: passName(log.args.label!, sandbox) });
         break;
-      case "PassRevoked":
-        activity.push({ ...base, kind: "revoked", title: "Pass revoked early", detail: `${log.args.label}.ops.${d.orgName}` });
+      }
+      case "PassRevoked": {
+        const sandbox = issuedSandbox(log.args.label, undefined);
+        activity.push({ ...base, kind: "revoked", title: sandbox ? "Sandbox pass ended" : "Pass revoked early", detail: passName(log.args.label!, sandbox) });
         break;
+      }
       case "Paid":
-        activity.push({ ...base, kind: "paid", title: `Customer paid ${usdc(log.args.amount!)}`, detail: `Order ${log.args.orderId!.slice(0, 10)}…` });
+        activity.push({ ...base, kind: "paid", title: `Customer paid ${usdc(log.args.amount!)}`, detail: `${onSandboxGate ? "Sandbox order" : "Order"} ${log.args.orderId!.slice(0, 10)}…` });
         break;
-      case "Refunded":
-        activity.push({ ...base, kind: "refund", title: `Refund of ${usdc(log.args.amount!)} paid`, detail: `${log.args.label}.ops.${d.orgName}` });
+      case "Refunded": {
+        const sandbox = onSandboxGate || issuedSandbox(log.args.label, undefined);
+        activity.push({ ...base, kind: "refund", title: `Refund of ${usdc(log.args.amount!)} paid`, detail: passName(log.args.label!, sandbox) });
         break;
-      case "CheckedIn":
-        activity.push({ ...base, kind: "checkin", title: "Ticket checked in", detail: `${log.args.label}.ops.${d.orgName}` });
+      }
+      case "CheckedIn": {
+        const sandbox = onSandboxGate || issuedSandbox(log.args.label, undefined);
+        activity.push({ ...base, kind: "checkin", title: "Ticket checked in", detail: passName(log.args.label!, sandbox) });
         break;
+      }
       case "BreakGlass":
         activity.push({ ...base, kind: "incident", title: "Break-glass: all passes stopped", detail: log.args.reason || "No reason given" });
         break;
@@ -405,7 +471,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     }
   }
   const orderMap = new Map<string, Order>();
-  for (const log of gateLogs) {
+  for (const log of [...gateLogs, ...events.sandbox]) {
     if (log.eventName === "Paid") {
       orderMap.set(log.args.orderId!, {
         orderId: log.args.orderId!,
@@ -415,13 +481,14 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
         blockNumber: log.blockNumber,
         ts: blockTimes.get(log.blockNumber) ?? 0,
         txHash: log.transactionHash,
+        gate: log.address,
       });
     }
   }
-  for (const log of gateLogs) {
+  for (const log of [...gateLogs, ...events.sandbox]) {
     if (log.eventName !== "Refunded") continue;
     const o = orderMap.get(log.args.orderId!);
-    if (o) o.refunded += log.args.amount!;
+    if (o && sameAddress(o.gate, log.address)) o.refunded += log.args.amount!;
   }
   const orders = [...orderMap.values()].sort((a, b) => (a.blockNumber < b.blockNumber ? 1 : -1));
 
@@ -438,6 +505,7 @@ async function loadSnapshot(passCache: Map<number, RawPass>, blockTimes: Map<big
     epoch: Number(epoch),
     gateFloat,
     presets,
+    demoPresets,
     passes: passes.reverse(),
     activity,
     leads,
@@ -451,7 +519,7 @@ export function OnShiftProvider({ children }: { children: ReactNode }) {
   const [chainOffset, setChainOffset] = useState(0);
   const passCache = useRef(new Map<number, RawPass>());
   const blockTimes = useRef(new Map<bigint, number>());
-  const events = useRef<EventCache>({ tip: -1n, issuer: [], gate: [], sw: [], pg: [] });
+  const events = useRef<EventCache>({ tip: -1n, issuer: [], gate: [], sandbox: [], sw: [], pg: [] });
   const inFlight = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {

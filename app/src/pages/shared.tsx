@@ -15,6 +15,10 @@ export function roleLook(preset?: Preset): { icon: LucideIcon; tint: Tint } {
       return { icon: Bot, tint: "graphite" };
     case "Door staff":
       return { icon: DoorOpen, tint: "teal" };
+    case "Demo cashier":
+      return { icon: ShoppingBag, tint: "blue" };
+    case "Demo agent":
+      return { icon: Bot, tint: "graphite" };
     default:
       return { icon: ScanLine, tint: "indigo" };
   }
@@ -42,4 +46,4 @@ export function whoIs(address: string, s: Snapshot, devices: Device[], org?: str
   return short(address);
 }
 
-export const passPreset = (s: Snapshot, p: PassRow) => s.presets[p.presetId];
+export const passPreset = (s: Snapshot, p: PassRow) => (p.sandbox ? s.demoPresets : s.presets)[p.presetId];

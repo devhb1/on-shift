@@ -4,7 +4,14 @@ import { clock, usdc } from "../lib/format";
 import { deployment } from "../lib/config";
 import { Countdown, useQr } from "./ui";
 
-const STYLE: Record<string, string> = { Cashier: "cashier", Support: "support", "AI agent": "agent", "Door staff": "door" };
+const STYLE: Record<string, string> = {
+  Cashier: "cashier",
+  Support: "support",
+  "AI agent": "agent",
+  "Door staff": "door",
+  "Demo cashier": "cashier",
+  "Demo agent": "agent",
+};
 
 export const verifyUrl = (name: string) =>
   `${window.location.origin}${window.location.pathname}#/verify?name=${encodeURIComponent(name)}`;

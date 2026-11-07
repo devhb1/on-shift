@@ -178,9 +178,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (key: string, fn: () => Promise<unknown>, success: string, detail?: string) => {
       setBusy(key);
       try {
-        const result = (await fn()) as { transactionHash?: string } | undefined;
+        const result = (await fn()) as { transactionHash?: string; blockNumber?: bigint } | undefined;
         const href = result?.transactionHash ? explorerTx(result.transactionHash) : "";
-        notify({ tone: "success", title: success, detail, href: href || undefined });
+        const mined = result?.blockNumber !== undefined ? `Confirmed in block ${result.blockNumber}.` : undefined;
+        notify({ tone: "success", title: success, detail: [detail, mined].filter(Boolean).join(" "), href: href || undefined });
         await refresh();
         return true;
       } catch (e) {

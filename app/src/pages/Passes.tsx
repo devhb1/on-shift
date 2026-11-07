@@ -11,7 +11,7 @@ import { ACTION_CHECK_IN, ACTION_REFUND, deployment, explorerAddress, explorerTx
 import { clock, sameAddress, short, timeAgo, usdc } from "../lib/format";
 import { passIssuerAbi, permissionedResolverAbi } from "../generated/abis";
 import { navigate } from "../App";
-import { ACTIVITY_LOOK, roleLook, whoIs } from "./shared";
+import { ACTIVITY_LOOK, passPreset, roleLook, whoIs } from "./shared";
 
 type Filter = "live" | "ended" | "all";
 
@@ -21,14 +21,15 @@ export function Passes({ selected }: { selected: string | null }) {
   const now = useChainNow();
   const s = snapshot!;
   const d = deployment!;
-  const anyLive = s.passes.some((p) => p.state === "live");
+  const staff = s.passes.filter((p) => !p.sandbox);
+  const anyLive = staff.some((p) => p.state === "live");
   const [filter, setFilter] = useState<Filter>(anyLive ? "live" : "all");
   const [query, setQuery] = useState("");
 
   const rows = useMemo(
     () =>
       s.passes.filter((p) => {
-        if (filter === "live" && p.state !== "live") return false;
+        if (filter === "live" && (p.state !== "live" || p.sandbox)) return false;
         if (filter === "ended" && p.state === "live") return false;
         const q = query.trim().toLowerCase();
         return !q || p.label.includes(q) || whoIs(p.holder, s, devices, d.org).toLowerCase().includes(q);
@@ -43,7 +44,7 @@ export function Passes({ selected }: { selected: string | null }) {
         <div>
           <h1 className="large-title">Passes</h1>
           <p className="page-sub">
-            {s.passes.length} issued · {s.passes.filter((p) => p.state === "live").length} on shift
+            {staff.length} issued · {staff.filter((p) => p.state === "live").length} on shift
           </p>
         </div>
         <Button variant="primary" icon={Plus} onClick={() => navigate("new")} disabled={s.incident}>
@@ -75,14 +76,15 @@ export function Passes({ selected }: { selected: string | null }) {
             </Empty>
           ) : (
             rows.map((p) => {
-              const look = roleLook(s.presets[p.presetId]);
+              const preset = passPreset(s, p);
+              const look = roleLook(preset);
               return (
                 <Row
                   key={p.index}
                   icon={look.icon}
                   tint={p.state === "live" ? look.tint : "soft"}
                   title={p.name}
-                  subtitle={`${whoIs(p.holder, s, devices, d.org)} · ${s.presets[p.presetId]?.name}`}
+                  subtitle={`${p.sandbox ? "Sandbox · " : ""}${whoIs(p.holder, s, devices, d.org)} · ${preset?.name ?? "Pass"}`}
                   trailing={p.state === "live" ? <Countdown expiry={p.expiry} /> : <StateBadge state={p.state} />}
                   selected={current?.index === p.index}
                   chevron
@@ -111,14 +113,14 @@ function Inspector({ pass, now }: { pass: PassRow; now: number }) {
   const { devices, operator, operatorRole, run, busy, notify } = useSession();
   const s = snapshot!;
   const d = deployment!;
-  const preset = s.presets[pass.presetId];
+  const preset = passPreset(s, pass);
   const [records, setRecords] = useState<{ org: string; role: string; status: string; payout: Hex; agent: string }>();
   const [confirm, setConfirm] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const node = passNode(pass.label);
+      const node = passNode(pass.label, pass.sandbox ? "demo" : "ops");
       const text = (key: string) => publicClient.readContract({ address: pass.resolver, abi: permissionedResolverAbi, functionName: "text", args: [node, key] });
       const [org, role, status, agent, payout] = await Promise.all([
         text("org"),
@@ -132,7 +134,7 @@ function Inspector({ pass, now }: { pass: PassRow; now: number }) {
     return () => {
       cancelled = true;
     };
-  }, [pass.label, pass.resolver, d.passIssuer, s.blockTs]);
+  }, [pass.label, pass.sandbox, pass.resolver, d.passIssuer, s.blockTs]);
 
   const canRevoke = pass.state === "live" && (operatorRole === "org" || (operator && sameAddress(operator.signer.address, pass.issuer)));
   const history = s.activity.filter((a) => a.label === pass.label && a.ts >= pass.issuedAt - 1 && a.ts <= Math.max(pass.expiry, pass.issuedAt) + 5);
