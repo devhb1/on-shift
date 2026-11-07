@@ -69,10 +69,12 @@ export function TryPage() {
   }, [me, d.playground, s.blockTs, mine.length]);
 
   useEffect(() => {
-    if (loop?.name || !me) return;
+    if (!me) return;
     const live = s.passes.find((p) => p.sandbox && p.state === "live" && sameAddress(p.requester, me));
-    if (live) setPlayIssued({ label: live.label, name: live.name });
-  }, [loop?.name, me, s.passes]);
+    if (!live) return;
+    // No-ops inside setPlayIssued when this name is already stored.
+    setPlayIssued({ label: live.label, name: live.name });
+  }, [me, s.passes, s.blockTs]);
 
   if (!d.playground) {
     return (

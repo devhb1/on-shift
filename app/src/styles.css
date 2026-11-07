@@ -1621,29 +1621,42 @@ textarea.input {
   gap: 8px;
 }
 
+.journey-wrap {
+  margin: 0 0 16px;
+}
+
 .journey {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0 0 8px;
   padding: 0;
 }
 
 .journey li {
+  margin: 0;
+  padding: 0;
+}
+
+.journey-pill {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--secondary);
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
   background: var(--surface);
+  border: 0;
   border-radius: 999px;
   padding: 6px 12px 6px 6px;
   box-shadow: var(--shadow-card);
+  cursor: pointer;
 }
 
-.journey li span {
+.journey-pill span,
+.step-idx {
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -1652,24 +1665,86 @@ textarea.input {
   background: var(--fill);
   color: var(--secondary);
   font-size: 12px;
+  font-weight: 700;
+  flex: none;
 }
 
-.journey li.here {
+.journey-pill.here,
+.journey-pill.done,
+.journey-pill.ready,
+.journey-pill.picked {
   color: var(--label);
 }
 
-.journey li.here span {
+.journey-pill.here span,
+.step-idx.here {
   background: linear-gradient(135deg, #4a90e2, #8e71eb);
   color: #fff;
 }
 
-.journey li.done span {
+.journey-pill.done span,
+.step-idx.done {
   background: var(--teal);
   color: #fff;
 }
 
-.journey li.done {
+.journey-pill.ready span,
+.step-idx.ready {
+  background: var(--blue-tint);
+  color: var(--blue);
+}
+
+.journey-pill.later {
+  color: var(--secondary);
+}
+
+.journey-pill.picked {
+  box-shadow: 0 0 0 2px var(--blue);
+}
+
+.step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.journey-note {
+  padding: 12px 16px 14px;
+  background: var(--surface-2);
+  border-top: 0.5px solid var(--separator);
+}
+
+.journey-wrap .journey-note {
+  border: 0;
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.journey-note b {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.journey-note p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--secondary);
+}
+
+.journey-note .when {
+  margin-top: 6px;
   color: var(--label);
+}
+
+.journey-note.blocked {
+  box-shadow: inset 3px 0 0 var(--orange-solid);
+}
+
+.journey-foot {
+  color: var(--secondary);
+  font-size: 13px;
 }
 
 .play-steps {
@@ -1738,8 +1813,16 @@ textarea.input {
   cursor: pointer;
 }
 
+.action-tile:disabled,
+.action-tile.is-locked {
+  opacity: 0.55;
+}
+
+.action-tile.is-locked {
+  cursor: pointer;
+}
+
 .action-tile:disabled {
-  opacity: 0.45;
   cursor: default;
 }
 

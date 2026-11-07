@@ -1,12 +1,10 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { isHex, keccak256, toHex, type Hex } from "viem";
 import {
-  BadgeCheck,
   Bot,
   Check,
   CircleDollarSign,
   Clock3,
-  FlaskConical,
   Lock,
   MessageSquare,
   Plus,
@@ -20,7 +18,7 @@ import { Button, CopyButton, Empty, Field, Group, Meter, NetworkNote, Qr, Row, S
 import { PlayJourney } from "../components/PlayJourney";
 import { PassCard } from "../components/PassCard";
 import { labelId, passNode, useOnShift, type PassRow } from "../lib/onshift";
-import { getPlayLoop, setPlayRefunded, subscribePlayLoop } from "../lib/playLoop";
+import { getPlayLoop, setPlayIssued, setPlayOrder, setPlayRefunded, subscribePlayLoop } from "../lib/playLoop";
 import { passPreset } from "./shared";
 import { useSession } from "../lib/session";
 import { send, simulate } from "../lib/tx";
@@ -181,13 +179,25 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
   const [ticket, setTicket] = useState("TKT-1042");
   const [status, setStatus] = useState("");
   const [probes, setProbes] = useState<Record<string, Probe>>({});
+  const [toolNote, setToolNote] = useState<string | null>(null);
+
+  const node = () => passNode(pass.label, pass.sandbox ? "demo" : "ops");
+  const openOrders = s.orders.filter((o) => sameAddress(o.gate, gate) && o.paid > o.refunded);
+  const guidedOrder = openOrders[0]?.orderId;
 
   useEffect(() => {
     if (pass.sandbox && loop?.orderId && !orderCode) setOrderCode(loop.orderId);
   }, [pass.sandbox, loop?.orderId, orderCode]);
 
-  const node = () => passNode(pass.label, pass.sandbox ? "demo" : "ops");
-  const openOrders = s.orders.filter((o) => sameAddress(o.gate, gate) && o.paid > o.refunded);
+  useEffect(() => {
+    if (!pass.sandbox) return;
+    const cur = getPlayLoop();
+    if (!cur?.name) {
+      setPlayIssued({ label: pass.label, name: pass.name });
+      return;
+    }
+    if (cur.name === pass.name && !cur.orderId && guidedOrder) setPlayOrder(guidedOrder);
+  }, [pass.sandbox, pass.label, pass.name, guidedOrder]);
   const codeOk = isHex(orderCode) && orderCode.length === 66;
   const order = codeOk ? s.orders.find((o) => sameAddress(o.gate, gate) && o.orderId.toLowerCase() === orderCode.toLowerCase()) : undefined;
   const amountUnits = (() => {
@@ -275,40 +285,30 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
       : []),
   ];
 
+  const loopMatches = !loop?.name || loop.name === pass.name;
+  const hasSandboxOrder = openOrders.length > 0 || Boolean(loopMatches && loop?.orderId && !loop.refundedAt);
+  const sandboxRefunded = Boolean(loopMatches && loop?.refundedAt) && openOrders.length === 0;
+
   return (
     <div className="stack" style={{ gap: 20 }}>
-      {pass.sandbox && <PlayJourney />}
       <PassCard pass={pass} preset={preset} />
 
-      {pass.sandbox && loop?.orderId && !loop.refundedAt && live && canRefund && (
-        <Group pad>
-          <p className="small secondary" style={{ margin: 0 }}>
-            Playground order ready. Tap Refund — the code is prefilled. Money returns only to the wallet that paid.
-          </p>
-          <Button block variant="primary" icon={CircleDollarSign} disabled={busy !== null} onClick={() => setSheet("refund")} style={{ marginTop: 10 }}>
-            Refund sandbox order
-          </Button>
-        </Group>
-      )}
-
-      {pass.sandbox && loop?.refundedAt && (
-        <Group pad>
-          <p className="small secondary" style={{ margin: 0 }}>
-            Refund confirmed. Public Check should say DEMO for {pass.name}.
-          </p>
-          <div className="play-actions" style={{ marginTop: 10 }}>
-            <Button variant="primary" icon={BadgeCheck} onClick={() => navigate("verify", { name: pass.name })}>
-              Next · Public check
-            </Button>
-            <Button icon={FlaskConical} onClick={() => navigate("try")}>
-              Playground
-            </Button>
-          </div>
-        </Group>
+      {pass.sandbox && (
+        <PlayJourney
+          variant="list"
+          passName={pass.name}
+          hasOrder={hasSandboxOrder}
+          refunded={sandboxRefunded}
+          holderHere
+          onRefund={() => setSheet("refund")}
+        />
       )}
 
       {live ? (
-        <>
+        <div className="stack-sm">
+          <div className="group-title" style={{ marginBottom: 0 }}>
+            <span>On this device</span>
+          </div>
           {pass.cap > 0n && (
             <div>
               <div className="row spread small secondary" style={{ marginBottom: 6 }}>
@@ -319,11 +319,23 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
             </div>
           )}
           <div className="action-grid">
-            <button className="action-tile" disabled={!canRefund || busy !== null} onClick={() => setSheet("refund")}>
+            <button
+              className={`action-tile ${canRefund ? "" : "is-locked"}`}
+              disabled={busy !== null}
+              onClick={() => (canRefund ? setSheet("refund") : setToolNote("Refund is off for this role. A preset with the refund action can open it, up to the limit printed on the pass."))}
+            >
               <CircleDollarSign size={24} color="var(--orange-solid)" />
               Refund
             </button>
-            <button className="action-tile" disabled={!canCheckIn || busy !== null} onClick={() => setSheet("checkin")}>
+            <button
+              className={`action-tile ${canCheckIn ? "" : "is-locked"}`}
+              disabled={busy !== null}
+              onClick={() =>
+                canCheckIn
+                  ? setSheet("checkin")
+                  : setToolNote("Check-in is off for this role. Demo agent can refund and update its status. Door staff is the role that checks tickets in.")
+              }
+            >
               <Ticket size={24} color="var(--green-solid)" />
               Check In
             </button>
@@ -332,8 +344,9 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
               Status
             </button>
           </div>
-          {pass.shiftStatus && <p className="small secondary" style={{ textAlign: "center" }}>Showing as “{pass.shiftStatus}”</p>}
-        </>
+          {toolNote && <p className="small" style={{ textAlign: "center", margin: 0 }}>{toolNote}</p>}
+          {pass.shiftStatus && <p className="small secondary" style={{ textAlign: "center", margin: 0 }}>Showing as “{pass.shiftStatus}”</p>}
+        </div>
       ) : (
         <Group pad>
           <div style={{ fontWeight: 600 }}>
