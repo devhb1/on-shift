@@ -54,7 +54,7 @@ export function Home() {
     <div className={`landing ns ${dark ? "ns-dark" : "ns-light"}`}>
       <header className="landing-bar">
         <a className="app-mark" href="#/home" aria-label="OnShift home">
-          <img src="/brand/onshift-mark.svg" width={34} height={34} alt="" />
+          <img src="/brand/onshift-mark.png" width={38} height={38} alt="" style={{ borderRadius: 10 }} />
           <span className="brand-word">OnShift</span>
         </a>
         <div className="row landing-nav">

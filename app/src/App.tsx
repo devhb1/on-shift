@@ -2,7 +2,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   Activity,
   BadgeCheck,
-  Clock3,
   CreditCard,
   FlaskConical,
   LayoutGrid,
@@ -21,6 +20,7 @@ import { useSession } from "./lib/session";
 import { deployment, isLocal, networkLabel } from "./lib/config";
 import { short } from "./lib/format";
 import { useTheme } from "./lib/theme";
+import { BrandMark } from "./components/BrandMark";
 import { Badge, NetworkNote, Toasts } from "./components/ui";
 import { Overview } from "./pages/Overview";
 import { Passes } from "./pages/Passes";
@@ -133,13 +133,7 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
     <div className="console">
       <aside className="sidebar">
         <div className="app-mark" role="link" tabIndex={0} style={{ cursor: "pointer" }} onClick={() => navigate("home")}>
-          <span className="app-icon">
-            <Clock3 size={18} strokeWidth={2.4} />
-          </span>
-          <div>
-            <div className="app-title">OnShift</div>
-            <div className="app-sub">{deployment?.orgName ?? "ENSv2"}</div>
-          </div>
+          <BrandMark size={34} withWord sub={deployment?.orgName ?? "ENSv2"} />
         </div>
         <nav className="nav">
           {CONSOLE.map((g) => (

@@ -1,9 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <title>OnShift mark</title>
-  <rect width="64" height="64" rx="16" fill="#0B0F19"/>
-  <circle cx="32" cy="32" r="17" fill="none" stroke="#1E2638" stroke-width="5"/>
-  <circle cx="32" cy="32" r="17" fill="none" stroke="#C6F432" stroke-width="5" stroke-linecap="round"
-          stroke-dasharray="80 26.8" transform="rotate(-90 32 32)"/>
-  <circle cx="15" cy="32" r="4.2" fill="#C6F432" stroke="#0B0F19" stroke-width="2"/>
-  <path d="M25 32.5l5 5L40 27" fill="none" stroke="#F4F6FA" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img">
+  <title>OnShift</title>
+  <rect width="64" height="64" rx="16" fill="#0B1430"/>
+  <g stroke="#FFFFFF" stroke-width="1.15" stroke-linejoin="round">
+    <path fill="#8E71EB" d="M32 5 L20 20 L32 24 Z"/>
+    <path fill="#4A90E2" d="M32 5 L44 20 L32 24 Z"/>
+    <path fill="#45C486" d="M20 20 L12 32 L26 28 L32 24 Z"/>
+    <path fill="#F5A623" d="M44 20 L52 32 L38 28 L32 24 Z"/>
+    <path fill="#4A90E2" d="M32 24 L26 28 L32 32 Z"/>
+    <path fill="#8E71EB" d="M32 24 L38 28 L32 32 Z"/>
+    <path fill="#F86D70" d="M26 28 L32 32 L26 36 Z"/>
+    <path fill="#45C486" d="M38 28 L32 32 L38 36 Z"/>
+    <path fill="#F86D70" d="M12 32 L26 28 L26 36 Z"/>
+    <path fill="#8E71EB" d="M52 32 L38 28 L38 36 Z"/>
+    <path fill="#F5A623" d="M12 32 L26 36 L20 44 L32 40 Z"/>
+    <path fill="#4A90E2" d="M52 32 L38 36 L44 44 L32 40 Z"/>
+    <path fill="#45C486" d="M20 44 L32 40 L32 59 Z"/>
+    <path fill="#F86D70" d="M44 44 L32 40 L32 59 Z"/>
+    <path fill="#8E71EB" d="M20 44 L26 36 L32 40 Z"/>
+    <path fill="#F5A623" d="M44 44 L38 36 L32 40 Z"/>
+  </g>
+  <g fill="#0B1430">
+    <circle cx="32" cy="32" r="2.35"/>
+    <circle cx="26" cy="28" r="1.55"/>
+    <circle cx="38" cy="28" r="1.55"/>
+    <circle cx="26" cy="36" r="1.55"/>
+    <circle cx="38" cy="36" r="1.55"/>
+  </g>
 </svg>

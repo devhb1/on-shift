@@ -192,10 +192,8 @@ export function Verify({ initialName }: { initialName: string }) {
   return (
     <div className="public">
       <nav className="public-nav">
-        <a href="#/verify" className="row" style={{ color: "var(--label)", fontWeight: 600 }}>
-          <span className="app-icon" style={{ width: 24, height: 24, borderRadius: 6 }}>
-            <Clock3 size={13} strokeWidth={2.6} />
-          </span>
+        <a href="#/verify" className="row" style={{ color: "var(--label)", fontWeight: 700, letterSpacing: "-0.03em" }}>
+          <img src="/brand/onshift-mark.svg" width={26} height={26} alt="" style={{ borderRadius: 7 }} />
           OnShift
         </a>
         <div className="row">

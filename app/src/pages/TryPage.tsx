@@ -286,8 +286,9 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="play-shell">
       <NetworkNote compact />
       <div className="device-bar">
-        <span className="btn" style={{ pointerEvents: "none" }}>
-          <FlaskConical size={15} /> Playground
+        <span className="btn" style={{ pointerEvents: "none", gap: 8 }}>
+          <img src="/brand/onshift-mark.png" width={20} height={20} alt="" style={{ borderRadius: 5 }} />
+          Playground
         </span>
         <div className="row">
           <ThemeToggle />

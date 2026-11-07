@@ -1,4 +1,4 @@
-import { Clock3 } from "lucide-react";
+import { BrandMark } from "../components/BrandMark";
 import { NetworkNote } from "../components/ui";
 import { deployment, explorerAddress } from "../lib/config";
 import { ThemeToggle, navigate } from "../App";
@@ -31,10 +31,8 @@ export function How() {
   return (
     <div className="public">
       <nav className="public-nav">
-        <button className="row" style={{ color: "var(--label)", fontWeight: 600, background: "none", border: 0, cursor: "pointer" }} onClick={() => navigate("home")}>
-          <span className="app-icon" style={{ width: 24, height: 24, borderRadius: 6 }}>
-            <Clock3 size={13} strokeWidth={2.6} />
-          </span>
+        <button className="row" style={{ color: "var(--label)", fontWeight: 700, background: "none", border: 0, cursor: "pointer", letterSpacing: "-0.03em" }} onClick={() => navigate("home")}>
+          <BrandMark size={26} />
           OnShift
         </button>
         <div className="row">
@@ -46,7 +44,7 @@ export function How() {
       </nav>
       <NetworkNote compact />
       <article className="guide">
-        <p className="landing-eyebrow" style={{ color: "var(--blue)" }}>How a person uses this, today</p>
+        <p className="landing-eyebrow" style={{ color: "var(--violet)" }}>How a person uses this, today</p>
         <h1 className="hero-title">One name. One shift. A receipt for every step.</h1>
         <p className="hero-sub">
           OnShift is live on Sepolia as {org}. A stranger does not get a staff pass. They either check a name, or they mint a sandbox pass under demo.{org}. The organisation wallet is the only one that can issue real staff.
