@@ -81,7 +81,8 @@ export function PayPage({ demo = false }: { demo?: boolean }) {
       async () => {
         const view = demo ? undefined : till ?? (await resolveTill());
         if (view?.quarantined) throw new Error("Till is quarantined");
-        const gate = demo && d.sandboxGate ? d.sandboxGate : view!.gate;
+        const gate = demo ? d.sandboxGate : view?.gate;
+        if (!gate) throw new Error(demo ? "No sandbox gate in this deployment" : "Till gate unavailable");
         const allowance = await publicClient.readContract({ address: d.usdc, abi: mockUSDCAbi, functionName: "allowance", args: [me, gate] });
         if (allowance < units) await send(operator.signer, { address: d.usdc, abi: mockUSDCAbi, functionName: "approve", args: [gate, units] });
         const receipt = await send(operator.signer, { address: gate, abi: shiftGateAbi, functionName: "pay", args: [units] });
@@ -110,7 +111,7 @@ export function PayPage({ demo = false }: { demo?: boolean }) {
             {demo ? <FlaskConical size={15} /> : <CreditCard size={15} />}
             {demo ? "Sandbox pay" : "Customer"}
           </span>
-          <span className="small secondary">Step 2 of the demo</span>
+          {demo && <span className="small secondary">Step 2 of the demo</span>}
         </div>
 
         <div className="stack" style={{ gap: 18 }}>
@@ -156,7 +157,17 @@ export function PayPage({ demo = false }: { demo?: boolean }) {
                     </div>
                   </Field>
                   {!demo && till?.quarantined && <p className="small secondary" style={{ marginBottom: 8 }}>till.{d.orgName} is quarantined. New payments are refused. A refund of an order you already paid still comes back here.</p>}
-                  <Button block variant="primary" disabled={busy !== null || units <= 0n || (!demo && till?.quarantined) || (balance !== undefined && balance < units)} onClick={pay}>
+                  <Button
+                    block
+                    variant="primary"
+                    disabled={
+                      busy !== null ||
+                      units <= 0n ||
+                      (demo ? !d.sandboxGate : !till?.gate || till.quarantined) ||
+                      (balance !== undefined && balance < units)
+                    }
+                    onClick={pay}
+                  >
                     {busy === "pay" ? "Paying…" : `Pay ${usdc(units)}`}
                   </Button>
                   {balance !== undefined && balance < units && <p className="small secondary" style={{ marginTop: 8 }}>Not enough {unit}. Get some above first.</p>}

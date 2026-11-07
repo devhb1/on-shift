@@ -247,6 +247,9 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
             <button className="nav-item" onClick={() => navigate("try")}>
               <FlaskConical size={17} /> Playground
             </button>
+            <button className="nav-item" onClick={() => navigate("pay", { demo: "1" })}>
+              <CreditCard size={17} /> Sandbox Pay
+            </button>
             <button className="nav-item" onClick={() => navigate("pay")}>
               <CreditCard size={17} /> Customer Pay
             </button>

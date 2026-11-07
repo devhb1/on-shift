@@ -27,6 +27,7 @@ type StepView = {
  */
 export function PlayJourney({
   variant = "pills",
+  compact = false,
   passName,
   hasOrder,
   refunded,
@@ -34,6 +35,8 @@ export function PlayJourney({
   onRefund,
 }: {
   variant?: "pills" | "list";
+  /** Shorter copy for the staff desk — keeps the refund CTA above the fold. */
+  compact?: boolean;
   /** Demo name already on screen. Used when this tab has not stored the playground loop yet. */
   passName?: string;
   hasOrder?: boolean;
@@ -64,9 +67,13 @@ export function PlayJourney({
       label: PLAY_STEPS[0],
       open: true,
       title: connected ? "Wallet connected" : "Connect a wallet",
-      body: connected
-        ? `${roleName} can issue a demo pass and pay the sandbox till. The staff device holds the pass and signs refunds.`
-        : "Playground accepts any wallet. Org admin is enough. That wallet issues the demo pass and pays the sandbox. The pass key stays on the staff device.",
+      body: compact
+        ? connected
+          ? `${roleName} connected. Issue and pay from this wallet; the pass key refunds.`
+          : "Connect any wallet. Org admin is enough."
+        : connected
+          ? `${roleName} can issue a demo pass and pay the sandbox till. The staff device holds the pass and signs refunds.`
+          : "Playground accepts any wallet. Org admin is enough. That wallet issues the demo pass and pays the sandbox. The pass key stays on the staff device.",
       cta: connected ? undefined : "Connect wallet",
       go: () => (connected ? navigate("try") : connectWallet()),
     },
@@ -74,9 +81,13 @@ export function PlayJourney({
       label: PLAY_STEPS[1],
       open: connected,
       title: name ? "Pass issued" : "Issue the demo pass",
-      body: name
-        ? `${name} is on a device. The connected wallet can pay the sandbox next.`
-        : "Issue it on Playground, onto a device in this browser. The name ends in .demo. Org admin can issue it. A shift-lead role is not required.",
+      body: compact
+        ? name
+          ? `${name} is live. Pay the sandbox next.`
+          : "Issue a demo pass onto a device in this browser."
+        : name
+          ? `${name} is on a device. The connected wallet can pay the sandbox next.`
+          : "Issue it on Playground, onto a device in this browser. The name ends in .demo. Org admin can issue it. A shift-lead role is not required.",
       when: connected ? undefined : "As soon as a wallet is connected. Org admin can issue. No staff role is required.",
       cta: name ? undefined : "Issue on Playground",
       go: () => navigate("try"),
@@ -85,8 +96,11 @@ export function PlayJourney({
       label: PLAY_STEPS[2],
       open: connected && Boolean(name),
       title: order || didRefund ? "Sandbox paid" : "Pay the sandbox",
-      body:
-        order || didRefund
+      body: compact
+        ? order || didRefund
+          ? "Order is on the sandbox till. Refund it from this device."
+          : "Pay the sandbox with test USDC. That creates the order to refund."
+        : order || didRefund
           ? "An order is on the sandbox till. The device that holds the pass refunds it. The money can only return to the wallet that paid."
           : `${roleName} pays the sandbox till with test USDC. Org admin is allowed to pay. The payment creates the order this device refunds.`,
       when: "Right after a demo pass exists. The organisation wallet can pay. It does not need a staff role, and it does not skip issuing.",
@@ -97,11 +111,17 @@ export function PlayJourney({
       label: PLAY_STEPS[3],
       open: order && !didRefund,
       title: didRefund ? "Refund confirmed" : "Refund the order",
-      body: didRefund
-        ? "The order went back to the payer. Public Check should show this name as a demo pass."
-        : holderHere
-          ? "This device holds the pass, so this device signs the refund. The organisation wallet cannot sign it. The money returns only to the wallet that paid."
-          : "The pass holder signs the refund. Open the staff app on that device. The connected wallet stays on the paying side, even when it is org admin.",
+      body: compact
+        ? didRefund
+          ? "Refunded to the payer. Open Public Check next."
+          : holderHere
+            ? "This device signs the refund. Money returns only to the wallet that paid."
+            : "Open the staff app on the device that holds the pass."
+        : didRefund
+          ? "The order went back to the payer. Public Check should show this name as a demo pass."
+          : holderHere
+            ? "This device holds the pass, so this device signs the refund. The organisation wallet cannot sign it. The money returns only to the wallet that paid."
+            : "The pass holder signs the refund. Open the staff app on that device. The connected wallet stays on the paying side, even when it is org admin.",
       when: "After the sandbox till has a paid order. The staff device that holds the pass then signs the refund. Org admin can pay that order. The holder key is the refund signer.",
       cta: didRefund ? undefined : holderHere ? "Refund this order" : "Open the staff app",
       go: () => (holderHere && onRefund ? onRefund() : navigate("device")),
@@ -110,9 +130,13 @@ export function PlayJourney({
       label: PLAY_STEPS[4],
       open: Boolean(name),
       title: "Check the name",
-      body: name
-        ? `Anyone can open Public Check for ${name}. No wallet role is involved. After the refund, the record should read as a demo pass.`
-        : "Public Check reads the demo name. Anyone can open it. Org admin has no extra gate on this step.",
+      body: compact
+        ? name
+          ? `Public Check for ${name}. No wallet needed.`
+          : "Anyone can open Public Check."
+        : name
+          ? `Anyone can open Public Check for ${name}. No wallet role is involved. After the refund, the record should read as a demo pass.`
+          : "Public Check reads the demo name. Anyone can open it. Org admin has no extra gate on this step.",
       when: "As soon as the demo name exists. The highlight moves here after the refund, when the record should say demo.",
       cta: "Check the name",
       go: () => name && navigate("verify", { name }),
@@ -190,18 +214,23 @@ export function PlayJourney({
   }
 
   return (
-    <div className="journey-wrap">
+    <div className={`journey-wrap ${compact ? "compact" : ""}`}>
       <ol className="journey" aria-label="Demo path">
         {steps.map((step, i) => (
           <li key={step.label}>
             <button type="button" className={`journey-pill ${step.kind} ${shown === i ? "picked" : ""}`} onClick={() => pick(i)}>
               <span>{i + 1}</span>
-              {step.label}
+              {compact ? ["Connect", "Issue", "Pay", "Refund", "Check"][i] : step.label}
             </button>
           </li>
         ))}
       </ol>
       {note}
+      {compact && operator && (
+        <p className="journey-foot compact-foot">
+          {roleName} · {short(operator.signer.address)} issues &amp; pays · this device refunds
+        </p>
+      )}
     </div>
   );
 }

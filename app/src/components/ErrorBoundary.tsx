@@ -16,8 +16,15 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private recover = (hash = "#/home") => {
-    this.setState({ error: undefined });
-    window.location.hash = hash;
+    try {
+      sessionStorage.removeItem("onshift.playLoop");
+      sessionStorage.removeItem("onshift.navTrail");
+    } catch {
+      /* ignore */
+    }
+    this.setState({ error: undefined }, () => {
+      window.location.hash = hash;
+    });
   };
 
   render() {

@@ -14,7 +14,7 @@
 ![Tag](https://img.shields.io/badge/tag-v1.0--ethglobal-5856d6)
 ![License](https://img.shields.io/badge/license-MIT-8e8e93)
 
-<img src="docs/screenshots/dashboard.jpg" alt="OnShift console" width="880" />
+<img src="docs/screenshots/landing.jpg" alt="OnShift — landing with live Sepolia pass" width="880" />
 
 </div>
 

@@ -20,7 +20,7 @@ import { Button, CopyButton, Empty, Field, Group, Meter, NetworkNote, Qr, Row, S
 import { PlayJourney } from "../components/PlayJourney";
 import { PassCard } from "../components/PassCard";
 import { labelId, passNode, useOnShift, type PassRow } from "../lib/onshift";
-import { getPlayLoop, setPlayIssued, setPlayOrder, setPlayRefunded, subscribePlayLoop } from "../lib/playLoop";
+import { getPlayLoop, setPlayIssued, setPlayRefunded, subscribePlayLoop } from "../lib/playLoop";
 import { passPreset } from "./shared";
 import { useSession } from "../lib/session";
 import { send, simulate } from "../lib/tx";
@@ -176,7 +176,9 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
 
   const node = () => passNode(pass.label, pass.sandbox ? "demo" : "ops");
   const openOrders = s.orders.filter((o) => sameAddress(o.gate, gate) && o.paid > o.refunded);
-  const guidedOrder = openOrders[0]?.orderId;
+  const myOrders = loop?.orderId
+    ? openOrders.filter((o) => o.orderId.toLowerCase() === loop.orderId!.toLowerCase())
+    : openOrders;
 
   useEffect(() => {
     if (pass.sandbox && loop?.orderId && !orderCode) setOrderCode(loop.orderId);
@@ -185,12 +187,9 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
   useEffect(() => {
     if (!pass.sandbox) return;
     const cur = getPlayLoop();
-    if (!cur?.name) {
-      setPlayIssued({ label: pass.label, name: pass.name });
-      return;
-    }
-    if (cur.name === pass.name && !cur.orderId && guidedOrder) setPlayOrder(guidedOrder);
-  }, [pass.sandbox, pass.label, pass.name, guidedOrder]);
+    if (!cur?.name) setPlayIssued({ label: pass.label, name: pass.name });
+    // Never auto-claim a stranger's open sandbox order into this loop.
+  }, [pass.sandbox, pass.label, pass.name]);
   const codeOk = isHex(orderCode) && orderCode.length === 66;
   const order = codeOk ? s.orders.find((o) => sameAddress(o.gate, gate) && o.orderId.toLowerCase() === orderCode.toLowerCase()) : undefined;
   const amountUnits = (() => {
@@ -279,137 +278,200 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
   ];
 
   const loopMatches = !loop?.name || loop.name === pass.name;
-  const hasSandboxOrder = openOrders.length > 0 || Boolean(loopMatches && loop?.orderId && !loop.refundedAt);
-  const sandboxRefunded = Boolean(loopMatches && loop?.refundedAt) && openOrders.length === 0;
+  const hasSandboxOrder = Boolean(loopMatches && loop?.orderId && !loop.refundedAt);
+  const sandboxRefunded = Boolean(loopMatches && loop?.refundedAt);
 
   return (
-    <div className="stack" style={{ gap: 20 }}>
-      <PassCard pass={pass} preset={preset} />
-      <div className="play-actions">
-        <Button icon={BadgeCheck} onClick={() => navigate("verify", { name: pass.name })}>
-          Check this name
-        </Button>
-        {pass.sandbox ? (
-          <Button icon={CreditCard} onClick={() => navigate("pay", { demo: "1" })}>
-            Customer pay
+    <div className="staff-desk">
+      <div className="staff-main stack-sm">
+        <PassCard pass={pass} preset={preset} desk />
+        <div className="play-actions">
+          <Button icon={BadgeCheck} onClick={() => navigate("verify", { name: pass.name })}>
+            Check this name
           </Button>
+          {pass.sandbox ? (
+            <Button icon={CreditCard} onClick={() => navigate("pay", { demo: "1" })}>
+              Customer pay
+            </Button>
+          ) : (
+            <Button onClick={() => navigate("passes")}>All passes</Button>
+          )}
+        </div>
+
+        {live ? (
+          <div className="staff-tools">
+            <div className="group-title" style={{ marginBottom: 0 }}>
+              <span>On this device</span>
+            </div>
+            {pass.cap > 0n && (
+              <div>
+                <div className="row spread small secondary" style={{ marginBottom: 6 }}>
+                  <span>Used {usdc(pass.spent)}</span>
+                  <span>
+                    {usdc(remaining)} left of {usdc(pass.cap)}
+                  </span>
+                </div>
+                <Meter value={pass.spent} max={pass.cap} />
+              </div>
+            )}
+            <div className="action-grid">
+              <button
+                className={`action-tile ${canRefund ? "" : "is-locked"}`}
+                disabled={busy !== null}
+                onClick={() =>
+                  canRefund
+                    ? setSheet("refund")
+                    : setToolNote("Refund is off for this role. A preset with the refund action can open it, up to the limit printed on the pass.")
+                }
+              >
+                <CircleDollarSign size={22} color="var(--orange-solid)" />
+                Refund
+              </button>
+              <button
+                className={`action-tile ${canCheckIn ? "" : "is-locked"}`}
+                disabled={busy !== null}
+                onClick={() =>
+                  canCheckIn
+                    ? setSheet("checkin")
+                    : setToolNote("Check-in is off for this role. Demo agent can refund and update its status. Door staff is the role that checks tickets in.")
+                }
+              >
+                <Ticket size={22} color="var(--green-solid)" />
+                Check In
+              </button>
+              <button className="action-tile" disabled={busy !== null} onClick={() => setSheet("status")}>
+                <MessageSquare size={22} color="var(--blue)" />
+                Status
+              </button>
+            </div>
+            {toolNote && (
+              <p className="small" style={{ textAlign: "center", margin: 0 }}>
+                {toolNote}
+              </p>
+            )}
+            {pass.shiftStatus && (
+              <p className="small secondary" style={{ textAlign: "center", margin: 0 }}>
+                Showing as “{pass.shiftStatus}”
+              </p>
+            )}
+          </div>
         ) : (
-          <Button onClick={() => navigate("passes")}>All passes</Button>
+          <Group pad>
+            <div style={{ fontWeight: 600 }}>
+              {pass.state === "revoked" ? "Your lead revoked this pass." : pass.state === "killed" ? "All passes were stopped for an incident." : `Your shift ended at ${clock(pass.expiry)}.`}
+            </div>
+            <p className="small secondary" style={{ margin: "4px 0 12px" }}>
+              Ask your shift lead for a new pass. Nobody had to switch this one off — it stopped by itself.
+            </p>
+            {canRefund && (
+              <Button
+                onClick={() =>
+                  probe("late", "Refund after the shift", () =>
+                    simulate(device.signer, { address: gate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
+                  )
+                }
+              >
+                Try a Refund Anyway
+              </Button>
+            )}
+            {probes.late && (
+              <p className="small" style={{ marginTop: 10, color: probes.late.blocked ? "var(--green)" : "var(--red)" }}>
+                {probes.late.blocked ? "Refused: " : ""}
+                {probes.late.why}
+              </p>
+            )}
+          </Group>
         )}
       </div>
 
-      {pass.sandbox && (
-        <PlayJourney
-          variant="list"
-          passName={pass.name}
-          hasOrder={hasSandboxOrder}
-          refunded={sandboxRefunded}
-          holderHere
-          onRefund={() => setSheet("refund")}
-        />
-      )}
+      <div className="staff-side stack-sm">
+        {pass.sandbox && (
+          <PlayJourney
+            variant="pills"
+            compact
+            passName={pass.name}
+            hasOrder={hasSandboxOrder}
+            refunded={sandboxRefunded}
+            holderHere
+            onRefund={() => setSheet("refund")}
+          />
+        )}
 
-      {live ? (
-        <div className="stack-sm">
-          <div className="group-title" style={{ marginBottom: 0 }}>
-            <span>On this device</span>
+        <div className="can-strip">
+          <div className="group-title">
+            <span>This pass can</span>
           </div>
-          {pass.cap > 0n && (
-            <div>
-              <div className="row spread small secondary" style={{ marginBottom: 6 }}>
-                <span>Used {usdc(pass.spent)}</span>
-                <span>{usdc(remaining)} left of {usdc(pass.cap)}</span>
-              </div>
-              <Meter value={pass.spent} max={pass.cap} />
-            </div>
-          )}
-          <div className="action-grid">
-            <button
-              className={`action-tile ${canRefund ? "" : "is-locked"}`}
-              disabled={busy !== null}
-              onClick={() => (canRefund ? setSheet("refund") : setToolNote("Refund is off for this role. A preset with the refund action can open it, up to the limit printed on the pass."))}
-            >
-              <CircleDollarSign size={24} color="var(--orange-solid)" />
-              Refund
-            </button>
-            <button
-              className={`action-tile ${canCheckIn ? "" : "is-locked"}`}
-              disabled={busy !== null}
-              onClick={() =>
-                canCheckIn
-                  ? setSheet("checkin")
-                  : setToolNote("Check-in is off for this role. Demo agent can refund and update its status. Door staff is the role that checks tickets in.")
-              }
-            >
-              <Ticket size={24} color="var(--green-solid)" />
-              Check In
-            </button>
-            <button className="action-tile" disabled={busy !== null} onClick={() => setSheet("status")}>
-              <MessageSquare size={24} color="var(--blue)" />
-              Status
-            </button>
-          </div>
-          {toolNote && <p className="small" style={{ textAlign: "center", margin: 0 }}>{toolNote}</p>}
-          {pass.shiftStatus && <p className="small secondary" style={{ textAlign: "center", margin: 0 }}>Showing as “{pass.shiftStatus}”</p>}
+          <ul className="can-chips">
+            <li className="ok">
+              <Check size={13} /> Status note
+            </li>
+            {canRefund && (
+              <li className="ok">
+                <Check size={13} /> Refund to payer · {usdc(pass.cap)}
+              </li>
+            )}
+            {canCheckIn && (
+              <li className="ok">
+                <Check size={13} /> Check in tickets
+              </li>
+            )}
+            <li className="no">
+              <Lock size={13} /> Pick refund recipient
+            </li>
+            <li className="no">
+              <Lock size={13} /> Redirect payouts
+            </li>
+            <li className="no">
+              <Lock size={13} /> Transfer the pass
+            </li>
+            <li className="no">
+              <Lock size={13} /> Extend or raise cap
+            </li>
+          </ul>
         </div>
-      ) : (
-        <Group pad>
-          <div style={{ fontWeight: 600 }}>
-            {pass.state === "revoked" ? "Your lead revoked this pass." : pass.state === "killed" ? "All passes were stopped for an incident." : `Your shift ended at ${clock(pass.expiry)}.`}
-          </div>
-          <p className="small secondary" style={{ margin: "4px 0 12px" }}>
-            Ask your shift lead for a new pass. Nobody had to switch this one off — it stopped by itself.
-          </p>
-          {canRefund && (
-            <Button
-              onClick={() =>
-                probe("late", "Refund after the shift", () =>
-                  simulate(device.signer, { address: gate, abi: shiftGateAbi, functionName: "refund", args: [pass.label, randomId(), 1_000_000n] }),
-                )
-              }
-            >
-              Try a Refund Anyway
-            </Button>
-          )}
-          {probes.late && <p className="small" style={{ marginTop: 10, color: probes.late.blocked ? "var(--green)" : "var(--red)" }}>{probes.late.blocked ? "Refused: " : ""}{probes.late.why}</p>}
-        </Group>
-      )}
 
-      <Group title="This pass can">
-        <Row icon={Check} tint="green" title="Update its status note" plain />
-        {canRefund && <Row icon={Check} tint="green" title={`Refund paid orders, up to ${usdc(pass.cap)} in total`} plain />}
-        {canCheckIn && <Row icon={Check} tint="green" title="Check in tickets" plain />}
-        <Row icon={Lock} tint="soft" title="Choose who a refund goes to" plain />
-        <Row icon={Lock} tint="soft" title="Change where payouts go" plain />
-        <Row icon={Lock} tint="soft" title="Transfer, sell or lend the pass" plain />
-        <Row icon={Lock} tint="soft" title="Extend the shift or raise the limit" plain />
-      </Group>
+        {live && (
+          <details className="probe-panel">
+            <summary>
+              <ShieldCheck size={15} /> Security check
+              <span className="small secondary">Tap attacks — no gas</span>
+            </summary>
+            <div className="probe-grid">
+              {PROBES.map((p) => {
+                const r = probes[p.key];
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    className={`probe-chip ${r ? (r.blocked ? "blocked" : "fail") : ""}`}
+                    onClick={() => probe(p.key, p.label, p.run)}
+                  >
+                    {r ? (r.blocked ? <ShieldCheck size={14} /> : <ShieldX size={14} />) : <ShieldCheck size={14} />}
+                    <span>
+                      <b>{p.label}</b>
+                      <small>{r ? (r.blocked ? `Blocked — ${r.why}` : r.why) : "Tap to try"}</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </details>
+        )}
 
-      {live && (
-        <Group title="Security Check" footer="What a rogue holder or a stolen phone would try. Each attempt is checked against the chain without spending gas.">
-          {PROBES.map((p) => {
-            const r = probes[p.key];
-            return (
+        {history.length > 0 && (
+          <Group title="Earlier passes">
+            {history.slice(0, 3).map((h) => (
               <Row
-                key={p.key}
-                icon={r ? (r.blocked ? ShieldCheck : ShieldX) : ShieldCheck}
-                tint={r ? (r.blocked ? "green" : "red") : "soft"}
-                title={p.label}
-                subtitle={r ? (r.blocked ? `Blocked — ${r.why}` : r.why) : "Tap to try"}
-                onClick={() => probe(p.key, p.label, p.run)}
+                key={h.index}
+                title={h.label}
+                subtitle={`${passPreset(s, h)?.name ?? `preset #${h.presetId}`} · ended ${clock(h.expiry)}`}
+                trailing={h.spent > 0n ? usdc(h.spent) : undefined}
+                plain
               />
-            );
-          })}
-        </Group>
-      )}
-
-      {history.length > 0 && (
-        <Group title="Earlier passes">
-          {history.slice(0, 5).map((h) => (
-            <Row key={h.index} title={h.label} subtitle={`${s.presets[h.presetId]?.name} · ended ${clock(h.expiry)}`} trailing={h.spent > 0n ? usdc(h.spent) : undefined} plain />
-          ))}
-        </Group>
-      )}
+            ))}
+          </Group>
+        )}
+      </div>
 
       {sheet && (
         <Sheet onClose={() => setSheet(null)}>
@@ -419,10 +481,10 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
               <p className="secondary small" style={{ margin: "6px 0 18px" }}>
                 {usdc(remaining)} left on this pass. The money goes back to the wallet that paid the order, in {isLocal ? "USDC" : "test USDC"}.
               </p>
-              {openOrders.length > 0 && (
+              {(loop?.orderId ? myOrders : openOrders).length > 0 && (
                 <div className="stack-sm" style={{ marginBottom: 14 }}>
-                  <div className="small secondary">Recent paid orders</div>
-                  {openOrders.slice(0, 4).map((o) => (
+                  <div className="small secondary">{loop?.orderId ? "Your playground order" : "Recent paid orders"}</div>
+                  {(loop?.orderId ? myOrders : openOrders).slice(0, 4).map((o) => (
                     <button
                       key={o.orderId}
                       className={`list-row plain ${o.orderId === orderCode ? "selected" : ""}`}
@@ -501,3 +563,4 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
     </div>
   );
 }
+

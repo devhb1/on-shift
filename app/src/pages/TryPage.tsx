@@ -70,9 +70,10 @@ export function TryPage() {
 
   useEffect(() => {
     if (!me) return;
+    // Never overwrite an in-progress loop (order / refund) with a different live pass.
+    if (getPlayLoop()?.name) return;
     const live = s.passes.find((p) => p.sandbox && p.state === "live" && sameAddress(p.requester, me));
     if (!live) return;
-    // No-ops inside setPlayIssued when this name is already stored.
     setPlayIssued({ label: live.label, name: live.name });
   }, [me, s.passes, s.blockTs]);
 
@@ -139,7 +140,7 @@ export function TryPage() {
   const issuedTx = (justIssued?.hash ?? loop?.hash) ? explorerTx(justIssued?.hash ?? loop?.hash ?? "") : "";
   const issuedBlock = justIssued?.block ?? loop?.block;
   const canIssue = busy === null && capOk && triesLeft !== 0 && (holderChoice === "new" || isAddress(pasted));
-  const livePass = mine.find((p) => p.state === "live") ?? s.passes.find((p) => p.sandbox && p.state === "live");
+  const livePass = mine.find((p) => p.state === "live") ?? (loop?.name ? s.passes.find((p) => p.name === loop.name && p.state === "live") : undefined);
   const nextName = issuedName ?? livePass?.name;
 
   return (
