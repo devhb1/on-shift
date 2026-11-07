@@ -145,100 +145,112 @@ export function Home() {
           </div>
         </div>
 
-        <aside className="pass-card" aria-label={example ? "Live pass read from Sepolia" : "No pass is on shift"}>
-          {example ? (
-            <>
-              <div className="pass-top">
-                <span className="pass-status">
-                  <span className="dot-live" /> {example.sandbox ? "ON SHIFT · DEMO" : "ON SHIFT"}
-                </span>
-                <span className="pass-org">{org}</span>
-              </div>
-              <div className="pass-ring">
-                <svg viewBox="0 0 140 140" aria-hidden>
-                  <defs>
-                    <linearGradient id="shiftArc" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#4A90E2" />
-                      <stop offset="35%" stopColor="#45C486" />
-                      <stop offset="70%" stopColor="#8E71EB" />
-                      <stop offset="100%" stopColor="#F5A623" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="70" cy="70" r={RING_R} fill="none" stroke="currentColor" strokeWidth="9" className="pass-ring-track" />
-                  <circle
-                    cx="70"
-                    cy="70"
-                    r={RING_R}
-                    fill="none"
-                    stroke="url(#shiftArc)"
-                    strokeWidth="9"
-                    strokeLinecap="round"
-                    strokeDasharray={RING}
-                    strokeDashoffset={ringOffset}
-                    transform="rotate(-90 70 70)"
-                    className="pass-ring-arc"
-                  />
-                </svg>
-                <div className="pass-ring-label">
-                  <div className="pass-time">
-                    <Countdown expiry={example.expiry} />
+        <div className="hero-stage">
+          <aside className={`pass-card ${example ? "is-live" : ""}`} aria-label={example ? "Live pass read from Sepolia" : "No pass is on shift"}>
+            {example ? (
+              <>
+                <div className="pass-top">
+                  <span className="pass-status">
+                    <span className="dot-live" /> {example.sandbox ? "ON SHIFT · DEMO" : "ON SHIFT"}
+                  </span>
+                  <span className="pass-org">{org}</span>
+                </div>
+                <div className="pass-ring">
+                  <svg viewBox="0 0 140 140" aria-hidden>
+                    <defs>
+                      <linearGradient id="shiftArc" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#4A90E2" />
+                        <stop offset="35%" stopColor="#45C486" />
+                        <stop offset="70%" stopColor="#8E71EB" />
+                        <stop offset="100%" stopColor="#F5A623" />
+                      </linearGradient>
+                    </defs>
+                    <circle cx="70" cy="70" r={RING_R} fill="none" stroke="currentColor" strokeWidth="9" className="pass-ring-track" />
+                    <circle
+                      cx="70"
+                      cy="70"
+                      r={RING_R}
+                      fill="none"
+                      stroke="url(#shiftArc)"
+                      strokeWidth="9"
+                      strokeLinecap="round"
+                      strokeDasharray={RING}
+                      strokeDashoffset={ringOffset}
+                      transform="rotate(-90 70 70)"
+                      className="pass-ring-arc"
+                    />
+                  </svg>
+                  <div className="pass-ring-label">
+                    <div className="pass-time">
+                      <Countdown expiry={example.expiry} />
+                    </div>
+                    <div className="pass-time-sub">left</div>
                   </div>
-                  <div className="pass-time-sub">left</div>
                 </div>
-              </div>
-              <div className="pass-name mono">{example.name}</div>
-              <div className="pass-kv">
-                <div>
-                  <small>Role</small>
-                  <b>{exampleRole}</b>
+                <div className="pass-name mono">{example.name}</div>
+                <div className="pass-kv">
+                  <div>
+                    <small>Role</small>
+                    <b>{exampleRole}</b>
+                  </div>
+                  <div>
+                    <small>Cap</small>
+                    <b>{example.cap > 0n ? usdc(example.cap - example.spent) : "—"}</b>
+                  </div>
+                  <div>
+                    <small>Holder</small>
+                    <b className="mono">{short(example.holder)}</b>
+                  </div>
                 </div>
-                <div>
-                  <small>Cap</small>
-                  <b>{example.cap > 0n ? usdc(example.cap - example.spent) : "—"}</b>
+                <ul className="pass-rules compact">
+                  <li className="ok">Refund only to the wallet that paid</li>
+                  <li className="no">Redirect payouts or raise the cap</li>
+                  <li className="no">Transfer the pass</li>
+                </ul>
+                <p className="pass-proof">
+                  <button type="button" onClick={() => navigate("verify", { name: example.name })}>
+                    Public check
+                  </button>
+                  {issueTx && explorerTx(issueTx.txHash) && (
+                    <a href={explorerTx(issueTx.txHash)} target="_blank" rel="noreferrer">
+                      Issuance tx ↗
+                    </a>
+                  )}
+                  {ensAppUrl(example.name) && (
+                    <a href={ensAppUrl(example.name)} target="_blank" rel="noreferrer">
+                      ENS ↗
+                    </a>
+                  )}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="pass-top">
+                  <span className="pass-status">NOBODY ON SHIFT</span>
+                  <span className="pass-org">{org}</span>
                 </div>
-                <div>
-                  <small>Holder</small>
-                  <b className="mono">{short(example.holder)}</b>
+                <p className="landing-sub" style={{ marginTop: 14, fontSize: 14 }}>
+                  The timer appears after a real Sepolia pass is mined. Open the Playground to issue one.
+                </p>
+                <div className="pass-proof">
+                  <button type="button" onClick={() => navigate("try")}>
+                    Issue a demo pass
+                  </button>
+                  {d && (
+                    <a href={explorerAddress(d.passIssuer)} target="_blank" rel="noreferrer">
+                      PassIssuer ↗
+                    </a>
+                  )}
                 </div>
-              </div>
-              <p className="pass-proof">
-                <button type="button" onClick={() => navigate("verify", { name: example.name })}>
-                  Public check
-                </button>
-                {issueTx && explorerTx(issueTx.txHash) && (
-                  <a href={explorerTx(issueTx.txHash)} target="_blank" rel="noreferrer">
-                    Issuance tx ↗
-                  </a>
-                )}
-                {ensAppUrl(example.name) && (
-                  <a href={ensAppUrl(example.name)} target="_blank" rel="noreferrer">
-                    ENS ↗
-                  </a>
-                )}
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="pass-top">
-                <span className="pass-status">NOBODY ON SHIFT</span>
-                <span className="pass-org">{org}</span>
-              </div>
-              <p className="landing-sub" style={{ marginTop: 14, fontSize: 14 }}>
-                The timer appears after a real Sepolia pass is mined. Open the Playground to issue one.
-              </p>
-              <div className="pass-proof">
-                <button type="button" onClick={() => navigate("try")}>
-                  Issue a demo pass
-                </button>
-                {d && (
-                  <a href={explorerAddress(d.passIssuer)} target="_blank" rel="noreferrer">
-                    PassIssuer ↗
-                  </a>
-                )}
-              </div>
-            </>
-          )}
-        </aside>
+              </>
+            )}
+          </aside>
+          <button type="button" className="lookalike-card" onClick={() => navigate("verify", { name: "onshlft.eth" })}>
+            <span className="lookalike-badge">NOT VERIFIED</span>
+            <span className="mono lookalike-name">onshlft.eth</span>
+            <span className="lookalike-msg">Look-alike of {org}, flagged.</span>
+          </button>
+        </div>
       </section>
 
       <section id="attacks" className="attacks-section">

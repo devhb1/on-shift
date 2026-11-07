@@ -14,10 +14,11 @@ export type PlayLoop = {
 
 function read(): PlayLoop | undefined {
   try {
+    if (typeof sessionStorage === "undefined") return undefined;
     const raw = sessionStorage.getItem(KEY);
     if (!raw) return undefined;
     const v = JSON.parse(raw) as PlayLoop;
-    if (!v?.name || !v?.label) return undefined;
+    if (typeof v?.name !== "string" || typeof v?.label !== "string") return undefined;
     return v;
   } catch {
     return undefined;

@@ -200,7 +200,12 @@ export function App() {
   }, []);
 
   const notReady = !deployment || (error && !snapshot);
-  const loading = <div className="empty">Reading {networkLabel}…</div>;
+  const loading = (
+    <div className="empty boot-wait">
+      <div className="empty-title">Reading {networkLabel}…</div>
+      <p className="secondary small">Pulling ENSv2 passes and till state. If this stays blank, hard-refresh or allow scripts for this site.</p>
+    </div>
+  );
 
   if (route === "verify") {
     return (

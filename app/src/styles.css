@@ -1903,6 +1903,28 @@ textarea.input {
   color: var(--secondary);
 }
 
+.boot-wait {
+  max-width: 420px;
+  margin: 18vh auto 0;
+}
+
+.boot-crash {
+  max-width: 440px;
+  margin: 18vh auto 0;
+  padding: 24px;
+  text-align: center;
+}
+
+.boot-crash h1 {
+  font-size: 22px;
+  margin: 0 0 10px;
+}
+
+.boot-crash p {
+  color: var(--secondary);
+  margin: 0 0 12px;
+}
+
 .empty-title {
   font-size: 17px;
   font-weight: 600;
@@ -2005,17 +2027,30 @@ body:has(.landing.ns-light) {
   --ns-live-ink: #fff;
   --ns-dead: var(--coral);
 
-  max-width: 1180px;
+  width: min(1360px, 100%);
   margin: 0 auto;
-  padding: 0 32px 72px;
+  padding: 0 clamp(20px, 3.5vw, 48px) 56px;
   color: var(--ns-fg);
-  background:
-    radial-gradient(ellipse 70% 48% at 78% -8%, var(--ns-wash-a), transparent 58%),
-    radial-gradient(ellipse 55% 42% at 8% 28%, var(--ns-wash-b), transparent 52%),
-    radial-gradient(ellipse 40% 30% at 55% 90%, var(--ns-wash-c), transparent 60%),
-    var(--ns-bg);
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  background: var(--ns-bg);
   min-height: 100vh;
   font-family: var(--font);
+}
+
+.landing.ns::before {
+  content: "";
+  position: absolute;
+  inset: -20% -10% auto -10%;
+  height: 70vh;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 50% at 78% 20%, var(--ns-wash-a), transparent 58%),
+    radial-gradient(ellipse 45% 45% at 12% 40%, var(--ns-wash-b), transparent 52%),
+    radial-gradient(ellipse 35% 35% at 48% 80%, var(--ns-wash-c), transparent 60%);
+  animation: wash-drift 18s ease-in-out infinite alternate;
 }
 
 .landing.ns-dark {
@@ -2151,13 +2186,21 @@ body:has(.landing.ns-light) {
 
 .landing.ns .night-hero {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 36px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.85fr);
+  gap: clamp(28px, 4vw, 56px);
   align-items: center;
-  padding: 18px 0 28px;
+  padding: 18px 0 24px;
   text-align: left;
   min-height: calc(100vh - 56px);
   min-height: calc(100dvh - 56px);
+}
+
+.landing.ns .hero-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(100%, 420px);
+  justify-self: end;
 }
 
 .landing.ns.compact {
@@ -2191,7 +2234,7 @@ body:has(.landing.ns-light) {
   font-size: 15px;
   line-height: 1.45;
   color: var(--ns-body);
-  max-width: 520px;
+  max-width: 640px;
   margin: 0;
 }
 
@@ -2202,7 +2245,7 @@ body:has(.landing.ns-light) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  max-width: 560px;
+  max-width: 640px;
 }
 
 .landing.ns .usp-row li {
@@ -2213,7 +2256,13 @@ body:has(.landing.ns-light) {
   border: 1px solid var(--ns-line);
   border-radius: 999px;
   padding: 6px 11px;
+  animation: rise-in 0.55s ease both;
 }
+
+.landing.ns .usp-row li:nth-child(1) { animation-delay: 0.05s; }
+.landing.ns .usp-row li:nth-child(2) { animation-delay: 0.12s; }
+.landing.ns .usp-row li:nth-child(3) { animation-delay: 0.19s; }
+.landing.ns .usp-row li:nth-child(4) { animation-delay: 0.26s; }
 
 .landing.ns .hero-ctas {
   display: flex;
@@ -2227,7 +2276,19 @@ body:has(.landing.ns-light) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 16px;
-  max-width: 560px;
+  max-width: 640px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing.ns::before,
+  .landing.ns .pass-card.is-live,
+  .landing.ns .pass-card.is-live::after,
+  .landing.ns .pass-card.is-live .pass-ring,
+  .landing.ns .usp-row li,
+  .landing.ns .hero-ctas .btn-primary::after,
+  .landing.ns .lookalike-card {
+    animation: none !important;
+  }
 }
 
 .landing.ns .door-chip {
@@ -2269,6 +2330,37 @@ body:has(.landing.ns-light) {
 
 .landing.ns .door-chip:hover {
   border-color: color-mix(in srgb, var(--door-accent) 50%, var(--ns-line));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--door-accent) 12%, transparent);
+}
+
+.landing.ns .door-chip {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing.ns .hero-ctas .btn-primary {
+  position: relative;
+  overflow: hidden;
+}
+
+.landing.ns .hero-ctas .btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.22) 48%, transparent 62%);
+  transform: translateX(-120%);
+  animation: cta-sheen 4.5s ease-in-out infinite;
+}
+
+@keyframes cta-sheen {
+  0%,
+  55% {
+    transform: translateX(-120%);
+  }
+  75%,
+  100% {
+    transform: translateX(120%);
+  }
 }
 
 .landing.ns .landing-check {
@@ -2278,7 +2370,7 @@ body:has(.landing.ns-light) {
   border: 1px solid var(--ns-line);
   border-radius: 999px;
   padding: 5px;
-  max-width: 560px;
+  max-width: 640px;
   gap: 0;
 }
 
@@ -2337,13 +2429,119 @@ body:has(.landing.ns-light) {
   padding: 18px 18px 16px;
   box-shadow: var(--ns-shadow);
   animation: pass-in 0.7s ease-out both;
-  align-self: center;
+  width: 100%;
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.landing.ns .pass-card.is-live {
+  animation: pass-in 0.7s ease-out both, pass-float 5.5s ease-in-out 0.7s infinite;
+  box-shadow:
+    var(--ns-shadow),
+    0 0 0 1px color-mix(in srgb, var(--ns-live) 18%, transparent),
+    0 18px 40px color-mix(in srgb, var(--ns-live) 10%, transparent);
+}
+
+.landing.ns .pass-card.is-live::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--ns-live) 28%, transparent);
+  animation: live-glow 2.8s ease-out infinite;
+}
+
+.landing.ns .pass-rules.compact {
+  margin-top: 10px;
+  gap: 5px;
+}
+
+.landing.ns .pass-rules.compact li {
+  font-size: 12px;
+}
+
+.landing.ns .lookalike-card {
+  width: 100%;
+  text-align: left;
+  border-radius: 16px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--coral) 35%, var(--ns-line));
+  background: color-mix(in srgb, var(--coral) 10%, var(--ns-card));
+  color: var(--ns-fg);
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  animation: rise-in 0.6s ease 0.35s both;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.landing.ns .lookalike-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--coral) 55%, var(--ns-line));
+}
+
+.landing.ns .lookalike-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--coral);
+}
+
+.landing.ns .lookalike-name {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.landing.ns .lookalike-msg {
+  font-size: 12px;
+  color: var(--ns-muted);
 }
 
 @keyframes pass-in {
   from {
     opacity: 0;
     transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pass-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes live-glow {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 30%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+
+@keyframes wash-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-2%, 3%, 0) scale(1.05);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -2416,6 +2614,20 @@ body:has(.landing.ns-light) {
 
 .landing.ns .pass-ring-arc {
   transition: stroke-dashoffset 0.9s linear;
+}
+
+.landing.ns .pass-card.is-live .pass-ring {
+  animation: ring-breathe 4.5s ease-in-out infinite;
+}
+
+@keyframes ring-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
 }
 
 .landing.ns .pass-rules {
@@ -2670,6 +2882,16 @@ body:has(.landing.ns-light) {
     gap: 20px;
     padding: 16px 0 28px;
     min-height: 0;
+  }
+  .landing.ns .hero-stage {
+    width: 100%;
+    justify-self: stretch;
+  }
+  .landing.ns .pass-card.is-live {
+    animation: pass-in 0.7s ease-out both;
+  }
+  .landing.ns .pass-card.is-live .pass-ring {
+    animation: none;
   }
   .landing.ns .landing-title {
     font-size: 34px;
