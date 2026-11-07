@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Activity,
+  ArrowLeft,
   BadgeCheck,
   CreditCard,
   FlaskConical,
@@ -72,9 +73,98 @@ function parseHash(): { route: Route; params: URLSearchParams } {
   return { route, params: new URLSearchParams(query ?? "") };
 }
 
+const TRAIL_KEY = "onshift.navTrail";
+let applyingBack = false;
+
+function readTrail(): string[] {
+  try {
+    const raw = JSON.parse(sessionStorage.getItem(TRAIL_KEY) || "[]");
+    return Array.isArray(raw) ? raw.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeTrail(trail: string[]) {
+  try {
+    sessionStorage.setItem(TRAIL_KEY, JSON.stringify(trail.slice(-16)));
+  } catch {
+    /* private mode */
+  }
+}
+
 export function navigate(route: Route, params?: Record<string, string>) {
   const q = params ? `?${new URLSearchParams(params)}` : "";
-  window.location.hash = `/${route}${q}`;
+  const next = `/${route}${q}`;
+  const cur = window.location.hash || "#/home";
+  if (!applyingBack && cur !== `#${next}`) {
+    const trail = readTrail();
+    trail.push(cur);
+    writeTrail(trail);
+  }
+  if (cur !== `#${next}`) window.location.hash = next;
+}
+
+/** Return to the screen you opened this one from. Falls back to Home. */
+export function goBack() {
+  const trail = readTrail();
+  const prev = trail.pop();
+  writeTrail(trail);
+  applyingBack = true;
+  window.location.hash = prev ? prev.replace(/^#/, "") : "/home";
+  window.setTimeout(() => {
+    applyingBack = false;
+  }, 0);
+}
+
+const FLOW_STEPS: { route: Route; label: string; params?: Record<string, string> }[] = [
+  { route: "overview", label: "Admin" },
+  { route: "try", label: "1 · Issue" },
+  { route: "pay", label: "2 · Pay", params: { demo: "1" } },
+  { route: "device", label: "3 · Pass" },
+  { route: "verify", label: "4 · Check" },
+];
+
+const FLOW_HINT: Partial<Record<Route, string>> = {
+  try: "Any wallet, not the org key. Issue creates play-….demo.onshift.eth. It cannot touch the production till.",
+  pay: "Customer wallet. Add test USDC and pay. Leave this tab open — the order code is what the pass refunds.",
+  device: "The staff pass. Refund the order you just paid. The QR opens Public Check. The steps above always take you back.",
+  verify: "No wallet. Paste the name, or Scan the QR on the staff pass. On shift is registry state, not “the name resolves.”",
+  how: "Three doors in the demo: the admin wallet, any other wallet, and a public check with no account.",
+};
+
+const CONSOLE_ROUTES = new Set<Route>(["overview", "passes", "new", "team", "security", "activity", "deployment"]);
+
+function JourneyBar({ route, demoPay }: { route: Route; demoPay?: boolean }) {
+  const hint =
+    route === "pay" && !demoPay
+      ? "This is the production till. A Playground pass cannot refund it. The demo uses 2 · Pay, which is the sandbox."
+      : FLOW_HINT[route];
+  return (
+    <div className="flow-bar">
+      <div className="flow-bar-row">
+        <button className="btn flow-back" type="button" onClick={() => goBack()}>
+          <ArrowLeft size={15} /> Back
+        </button>
+        <button className="flow-brand" type="button" onClick={() => navigate("home")}>
+          <BrandMark size={22} />
+          <span>OnShift</span>
+        </button>
+        <nav className="flow-steps" aria-label="Demo path">
+          {FLOW_STEPS.map((step) => {
+            const on = step.route === "overview" ? CONSOLE_ROUTES.has(route) : route === step.route;
+            return (
+              <button key={step.route} type="button" className={`flow-step ${on ? "on" : ""}`} onClick={() => navigate(step.route, step.params)} aria-current={on ? "page" : undefined}>
+                {step.label}
+              </button>
+            );
+          })}
+        </nav>
+        <ThemeToggle />
+      </div>
+      {hint && <p className="flow-hint">{hint}</p>}
+    </div>
+  );
 }
 
 export function ThemeToggle() {
@@ -172,12 +262,14 @@ function ConsoleLayout({ route, children }: { route: Route; children: ReactNode 
         </div>
       </aside>
       <main className="main">
-        <div className="toolbar">
-          <span className="footnote net-status">
-            <span style={{ color: error ? "var(--red)" : "var(--green)" }}>●</span> {error ? "Network unreachable" : networkLabel}
-          </span>
-          <ThemeToggle />
-          <AccountControl />
+        <div className="console-chrome">
+          <JourneyBar route={route} />
+          <div className="toolbar">
+            <span className="footnote net-status">
+              <span style={{ color: error ? "var(--red)" : "var(--green)" }}>●</span> {error ? "Network unreachable" : networkLabel}
+            </span>
+            <AccountControl />
+          </div>
         </div>
         <NetworkNote />
         {children}
@@ -192,6 +284,13 @@ export function App() {
 
   useEffect(() => {
     const onHash = () => {
+      if (!applyingBack) {
+        const trail = readTrail();
+        if (trail.length && trail[trail.length - 1] === window.location.hash) {
+          trail.pop();
+          writeTrail(trail);
+        }
+      }
       setLocation(parseHash());
       window.scrollTo(0, 0);
     };
@@ -207,22 +306,6 @@ export function App() {
     </div>
   );
 
-  if (route === "verify") {
-    return (
-      <>
-        {notReady ? <Setup error={error} /> : <Verify initialName={params.get("name") ?? ""} />}
-        <Toasts />
-      </>
-    );
-  }
-  if (route === "how") {
-    return (
-      <>
-        <How />
-        <Toasts />
-      </>
-    );
-  }
   if (route === "home") {
     return (
       <>
@@ -231,22 +314,24 @@ export function App() {
       </>
     );
   }
-  if (route === "pay" || route === "try") {
-    return (
-      <>
-        {notReady ? <Setup error={error} /> : !snapshot ? loading : route === "pay" ? <PayPage demo={params.get("demo") === "1"} /> : <TryPage />}
-        <Toasts />
-      </>
-    );
-  }
-  if (route === "device") {
-    return (
-      <>
-        {notReady ? <Setup error={error} /> : !snapshot ? loading : <DeviceApp />}
-        <Toasts />
-      </>
-    );
-  }
+
+  const demoPay = params.get("demo") === "1";
+  const leaf = (
+    <>
+      <JourneyBar route={route} demoPay={demoPay} />
+      {route === "verify" ? (
+        notReady ? <Setup error={error} /> : <Verify initialName={params.get("name") ?? ""} />
+      ) : route === "how" ? (
+        <How />
+      ) : route === "pay" || route === "try" ? (
+        notReady ? <Setup error={error} /> : !snapshot ? loading : route === "pay" ? <PayPage demo={demoPay} /> : <TryPage />
+      ) : route === "device" ? (
+        notReady ? <Setup error={error} /> : !snapshot ? loading : <DeviceApp />
+      ) : null}
+      <Toasts />
+    </>
+  );
+  if (route === "verify" || route === "how" || route === "pay" || route === "try" || route === "device") return leaf;
 
   const pages: Record<string, ReactNode> = {
     overview: <Overview />,

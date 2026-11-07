@@ -1,7 +1,6 @@
-import { BrandMark } from "../components/BrandMark";
 import { NetworkNote } from "../components/ui";
 import { deployment, explorerAddress } from "../lib/config";
-import { ThemeToggle, navigate } from "../App";
+import { navigate } from "../App";
 
 type Node = { id: string; x: number; y: number; w: number; h: number; title: string; sub: string; tone?: "sky" | "teal" | "violet" | "peach" | "coral" | "ink" };
 type Edge = { from: string; to: string; label?: string; bad?: boolean };
@@ -112,18 +111,6 @@ export function How() {
   const org = d?.orgName ?? "onshift.eth";
   return (
     <div className="public">
-      <nav className="public-nav">
-        <button className="row" style={{ color: "var(--label)", fontWeight: 700, background: "none", border: 0, cursor: "pointer", letterSpacing: "-0.03em" }} onClick={() => navigate("home")}>
-          <BrandMark size={26} />
-          OnShift
-        </button>
-        <div className="row">
-          <ThemeToggle />
-          <a href="#/try">Playground</a>
-          <a href="#/verify">Public Check</a>
-          <a href="#/overview">Console</a>
-        </div>
-      </nav>
       <NetworkNote compact />
       <article className="guide">
         <p className="landing-eyebrow" style={{ color: "var(--violet)" }}>How people use OnShift today</p>

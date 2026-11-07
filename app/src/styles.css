@@ -359,6 +359,18 @@ textarea {
   margin-right: auto;
 }
 
+.console-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--chrome);
+}
+
+.console-chrome .flow-bar,
+.console-chrome .toolbar {
+  position: static;
+}
+
 .toolbar {
   position: sticky;
   top: 0;
@@ -1308,6 +1320,89 @@ textarea.input {
   padding: 14px 0 18px;
 }
 
+.flow-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--chrome);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--separator);
+  padding: 8px 14px 10px;
+}
+
+.flow-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.flow-back {
+  flex: 0 0 auto;
+}
+
+.flow-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--label);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.flow-steps {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.flow-steps::-webkit-scrollbar {
+  display: none;
+}
+
+.flow-step {
+  flex: 0 0 auto;
+  border: 0;
+  background: var(--surface);
+  color: var(--secondary);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.flow-step.on {
+  background: var(--label);
+  color: var(--bg);
+}
+
+.flow-hint {
+  margin: 7px 0 0;
+  color: var(--secondary);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .flow-brand span {
+    display: none;
+  }
+}
+
 .play-shell {
   width: min(1040px, 100%);
   margin: 0 auto;
@@ -1855,7 +1950,7 @@ textarea.input {
 .hero {
   max-width: 680px;
   margin: 0 auto;
-  padding: 72px 20px 40px;
+  padding: 36px 20px 40px;
   text-align: center;
 }
 

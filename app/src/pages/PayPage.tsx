@@ -11,7 +11,7 @@ import { deployment, explorerTx, isLocal } from "../lib/config";
 import { clock, sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { resolveTill, type TillView } from "../lib/till";
 import { mockUSDCAbi, shiftGateAbi } from "../generated/abis";
-import { ThemeToggle, navigate } from "../App";
+import { navigate } from "../App";
 
 const unit = isLocal ? "USDC" : "test USDC";
 
@@ -110,18 +110,7 @@ export function PayPage({ demo = false }: { demo?: boolean }) {
             {demo ? <FlaskConical size={15} /> : <CreditCard size={15} />}
             {demo ? "Sandbox pay" : "Customer"}
           </span>
-          <div className="row">
-            <ThemeToggle />
-            {demo ? (
-              <Button variant="plain" onClick={() => navigate("try")}>
-                Back to Playground
-              </Button>
-            ) : (
-              <Button variant="plain" onClick={() => navigate("home")}>
-                Home
-              </Button>
-            )}
-          </div>
+          <span className="small secondary">Step 2 of the demo</span>
         </div>
 
         <div className="stack" style={{ gap: 18 }}>

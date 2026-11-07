@@ -8,7 +8,7 @@ import { isDemoPassName, labelId, passNode } from "../lib/onshift";
 import { deployment, explorerAddress, isLocal, networkLabel, UNIVERSAL_RESOLVER, VERIFIED_ORGS } from "../lib/config";
 import { clock, levenshtein, short, usdc } from "../lib/format";
 import { passIssuerAbi, permissionedRegistryAbi, permissionedResolverAbi, shiftGateAbi } from "../generated/abis";
-import { ThemeToggle, navigate } from "../App";
+import { navigate } from "../App";
 
 type Result =
   | { kind: "invalid"; name: string }
@@ -191,17 +191,6 @@ export function Verify({ initialName }: { initialName: string }) {
 
   return (
     <div className="public">
-      <nav className="public-nav">
-        <a href="#/verify" className="row" style={{ color: "var(--label)", fontWeight: 700, letterSpacing: "-0.03em" }}>
-          <img src="/brand/onshift-mark.svg" width={26} height={26} alt="" style={{ borderRadius: 7 }} />
-          OnShift
-        </a>
-        <div className="row">
-          <ThemeToggle />
-          <a href="#/home">Home</a>
-          <a href="#/overview">Console</a>
-        </div>
-      </nav>
       <NetworkNote compact />
 
       <section className="hero">

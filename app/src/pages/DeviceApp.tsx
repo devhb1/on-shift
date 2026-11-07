@@ -1,10 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { isHex, keccak256, toHex, type Hex } from "viem";
 import {
+  BadgeCheck,
   Bot,
   Check,
   CircleDollarSign,
   Clock3,
+  CreditCard,
   Lock,
   MessageSquare,
   Plus,
@@ -28,7 +30,7 @@ import { ACTION_CHECK_IN, ACTION_REFUND, deployment, isLocal } from "../lib/conf
 import { ATTACKER_ADDRESS, type Device } from "../lib/identities";
 import { clock, sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { permissionedRegistryAbi, permissionedResolverAbi, shiftGateAbi } from "../generated/abis";
-import { ThemeToggle, navigate } from "../App";
+import { navigate } from "../App";
 
 const randomId = (): Hex => keccak256(toHex(`${Date.now()}-${Math.random()}`));
 
@@ -45,15 +47,6 @@ export function DeviceApp() {
             {device?.kind === "agent" ? <Bot size={15} /> : <Smartphone size={15} />}
             {device ? device.name : "Choose device"}
           </button>
-          <div className="row">
-            <ThemeToggle />
-            <Button variant="plain" onClick={() => navigate("try")}>
-              Playground
-            </Button>
-            <Button variant="plain" onClick={() => navigate("overview")}>
-              Console
-            </Button>
-          </div>
         </div>
 
         {device ? <DeviceHome device={device} /> : <Pick devices={devices} onPick={setDevice} onCreate={(k) => addDevice(k === "agent" ? `Agent ${devices.filter((d) => d.kind === "agent").length + 1}` : `Staff phone ${devices.filter((d) => d.kind === "staff").length + 1}`, k)} />}
@@ -292,6 +285,18 @@ function PassHome({ device, pass, history }: { device: Device; pass: PassRow; hi
   return (
     <div className="stack" style={{ gap: 20 }}>
       <PassCard pass={pass} preset={preset} />
+      <div className="play-actions">
+        <Button icon={BadgeCheck} onClick={() => navigate("verify", { name: pass.name })}>
+          Check this name
+        </Button>
+        {pass.sandbox ? (
+          <Button icon={CreditCard} onClick={() => navigate("pay", { demo: "1" })}>
+            Customer pay
+          </Button>
+        ) : (
+          <Button onClick={() => navigate("passes")}>All passes</Button>
+        )}
+      </div>
 
       {pass.sandbox && (
         <PlayJourney

@@ -128,7 +128,13 @@ export function PlayJourney({
     const step = steps[index];
     const alreadyShowing = shown === index;
     setPicked({ stage, index });
-    if (!step?.open || index < stage) return;
+    if (!step) return;
+    // Finished steps stay clickable so the pass is not a dead end.
+    if (index < stage) {
+      step.go();
+      return;
+    }
+    if (!step.open) return;
     if (index === stage || alreadyShowing) step.go();
   };
 

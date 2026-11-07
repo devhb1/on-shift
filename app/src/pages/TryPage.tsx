@@ -12,7 +12,7 @@ import { deployment, explorerTx, GAS_DRIP_WEI, isLocal } from "../lib/config";
 import { sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { playgroundAbi } from "../generated/abis";
 import { passPreset } from "./shared";
-import { ThemeToggle, navigate } from "../App";
+import { navigate } from "../App";
 
 const MAX_CAP = 5;
 const MAX_PER_DAY = 3;
@@ -319,21 +319,6 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="play-shell">
       <NetworkNote compact />
-      <div className="device-bar">
-        <span className="btn" style={{ pointerEvents: "none", gap: 8 }}>
-          <img src="/brand/onshift-mark.svg" width={22} height={22} alt="" style={{ borderRadius: 6 }} />
-          Playground
-        </span>
-        <div className="row">
-          <ThemeToggle />
-          <Button variant="plain" onClick={() => navigate("how")}>
-              How it works
-            </Button>
-          <Button variant="plain" onClick={() => navigate("home")}>
-              Home
-            </Button>
-        </div>
-      </div>
       {children}
     </div>
   );
