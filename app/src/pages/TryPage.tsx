@@ -287,7 +287,7 @@ function Shell({ children }: { children: React.ReactNode }) {
       <NetworkNote compact />
       <div className="device-bar">
         <span className="btn" style={{ pointerEvents: "none", gap: 8 }}>
-          <img src="/brand/onshift-mark.png" width={20} height={20} alt="" style={{ borderRadius: 5 }} />
+          <img src="/brand/onshift-mark.svg" width={22} height={22} alt="" style={{ borderRadius: 6 }} />
           Playground
         </span>
         <div className="row">

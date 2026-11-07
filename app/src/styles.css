@@ -1,4 +1,4 @@
-/* OnShift — faceted brand: navy ink, sky CTA, mosaic accents (violet / teal / peach / coral). */
+/* OnShift — shift-clock brand: navy ink, sky CTA, teal live, violet / peach accents. */
 
 :root {
   --ink: #0b1430;
@@ -314,7 +314,7 @@ textarea {
 }
 
 .nav-item.active {
-  background: var(--fill);
+  background: var(--blue-tint);
   font-weight: 600;
 }
 
@@ -1573,9 +1573,13 @@ textarea.input {
   color: var(--label);
 }
 
-.journey li.here span,
+.journey li.here span {
+  background: linear-gradient(135deg, #4a90e2, #8e71eb);
+  color: #fff;
+}
+
 .journey li.done span {
-  background: var(--blue);
+  background: var(--teal);
   color: #fff;
 }
 
@@ -2243,7 +2247,6 @@ body:has(.landing.ns-light) {
 }
 
 .landing.ns .pass-ring-arc {
-  color: var(--ns-live);
   transition: stroke-dashoffset 0.9s linear;
 }
 
@@ -2337,6 +2340,7 @@ body:has(.landing.ns-light) {
 }
 
 .landing.ns .door {
+  --door-accent: var(--sky);
   text-align: left;
   background: var(--ns-panel);
   border: 1px solid var(--ns-line);
@@ -2348,18 +2352,33 @@ body:has(.landing.ns-light) {
   cursor: pointer;
   font: inherit;
   color: inherit;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+.landing.ns .door.tone-sky { --door-accent: #4a90e2; }
+.landing.ns .door.tone-violet { --door-accent: #8e71eb; }
+.landing.ns .door.tone-teal { --door-accent: #45c486; }
+
 .landing.ns .door:hover {
-  border-color: var(--ns-live);
+  border-color: color-mix(in srgb, var(--door-accent) 55%, var(--ns-line));
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--door-accent) 14%, transparent);
   transform: translateY(-2px);
+}
+
+.landing.ns .door-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: var(--door-accent);
+  background: color-mix(in srgb, var(--door-accent) 14%, transparent);
 }
 
 .landing.ns .door-title {
   font-size: 17px;
   font-weight: 650;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .landing.ns .door-body {
@@ -2370,7 +2389,7 @@ body:has(.landing.ns-light) {
 }
 
 .landing.ns .door-cta {
-  color: var(--ns-live);
+  color: var(--door-accent);
   font-size: 14px;
   font-weight: 600;
   display: inline-flex;

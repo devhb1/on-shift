@@ -1,36 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img">
   <title>OnShift</title>
+  <!-- Original mark: shift clock that verifies — palette from brand, not a gem copy -->
   <rect width="64" height="64" rx="16" fill="#0B1430"/>
-  <!-- Faceted diamond: mosaic of lavender, sky, teal, peach, coral -->
-  <g stroke="#FFFFFF" stroke-width="1.15" stroke-linejoin="round">
-    <!-- top -->
-    <path fill="#8E71EB" d="M32 5 L20 20 L32 24 Z"/>
-    <path fill="#4A90E2" d="M32 5 L44 20 L32 24 Z"/>
-    <!-- upper sides -->
-    <path fill="#45C486" d="M20 20 L12 32 L26 28 L32 24 Z"/>
-    <path fill="#F5A623" d="M44 20 L52 32 L38 28 L32 24 Z"/>
-    <!-- central diamond (4) -->
-    <path fill="#4A90E2" d="M32 24 L26 28 L32 32 Z"/>
-    <path fill="#8E71EB" d="M32 24 L38 28 L32 32 Z"/>
-    <path fill="#F86D70" d="M26 28 L32 32 L26 36 Z"/>
-    <path fill="#45C486" d="M38 28 L32 32 L38 36 Z"/>
-    <!-- waist sides -->
-    <path fill="#F86D70" d="M12 32 L26 28 L26 36 Z"/>
-    <path fill="#8E71EB" d="M52 32 L38 28 L38 36 Z"/>
-    <!-- lower sides -->
-    <path fill="#F5A623" d="M12 32 L26 36 L20 44 L32 40 Z"/>
-    <path fill="#4A90E2" d="M52 32 L38 36 L44 44 L32 40 Z"/>
-    <!-- bottom -->
-    <path fill="#45C486" d="M20 44 L32 40 L32 59 Z"/>
-    <path fill="#F86D70" d="M44 44 L32 40 L32 59 Z"/>
-    <path fill="#8E71EB" d="M20 44 L26 36 L32 40 Z"/>
-    <path fill="#F5A623" d="M44 44 L38 36 L32 40 Z"/>
-  </g>
-  <g fill="#0B1430">
-    <circle cx="32" cy="32" r="2.35"/>
-    <circle cx="26" cy="28" r="1.55"/>
-    <circle cx="38" cy="28" r="1.55"/>
-    <circle cx="26" cy="36" r="1.55"/>
-    <circle cx="38" cy="36" r="1.55"/>
-  </g>
+  <!-- track -->
+  <circle cx="34" cy="32" r="17" fill="none" stroke="#1A2744" stroke-width="5.5"/>
+  <!-- four arc segments (almost full shift) -->
+  <circle cx="34" cy="32" r="17" fill="none" stroke="#4A90E2" stroke-width="5.5" stroke-linecap="round"
+          stroke-dasharray="22 84.8" transform="rotate(-78 34 32)"/>
+  <circle cx="34" cy="32" r="17" fill="none" stroke="#45C486" stroke-width="5.5" stroke-linecap="round"
+          stroke-dasharray="22 84.8" transform="rotate(12 34 32)"/>
+  <circle cx="34" cy="32" r="17" fill="none" stroke="#8E71EB" stroke-width="5.5" stroke-linecap="round"
+          stroke-dasharray="22 84.8" transform="rotate(102 34 32)"/>
+  <circle cx="34" cy="32" r="17" fill="none" stroke="#F5A623" stroke-width="5.5" stroke-linecap="round"
+          stroke-dasharray="18 84.8" transform="rotate(192 34 32)"/>
+  <!-- live node -->
+  <circle cx="14.5" cy="32" r="4" fill="#45C486"/>
+  <circle cx="14.5" cy="32" r="4" fill="none" stroke="#0B1430" stroke-width="1.6"/>
+  <!-- verified -->
+  <path d="M26.5 32.4l4.6 4.6 9.4-10.2" fill="none" stroke="#F4F7FB" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

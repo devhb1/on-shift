@@ -21,10 +21,10 @@ const ATTACKS: { try: string; result: string; who: string; ok?: boolean }[] = [
   { try: "Refund the real customer, within cap", result: "allowed", who: "The only thing a pass can do", ok: true },
 ];
 
-const DOORS: { route: Route; icon: typeof BadgeCheck; title: string; body: string; cta: string }[] = [
-  { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Paste a name. If they DMed you as support, this is the check.", cta: "Public Check" },
-  { route: "try", icon: FlaskConical, title: "Try a demo pass", body: "Mint under demo.onshift.eth — never real staff, never the production till.", cta: "Playground" },
-  { route: "device", icon: Smartphone, title: "I'm on shift", body: "Refunds only go back to the wallet that paid.", cta: "Staff App" },
+const DOORS: { route: Route; icon: typeof BadgeCheck; title: string; body: string; cta: string; tone: "sky" | "violet" | "teal" }[] = [
+  { route: "verify", icon: BadgeCheck, title: "Check someone", body: "Paste a name. If they DMed you as support, this is the check.", cta: "Public Check", tone: "sky" },
+  { route: "try", icon: FlaskConical, title: "Try a demo pass", body: "Mint under demo.onshift.eth — never real staff, never the production till.", cta: "Playground", tone: "violet" },
+  { route: "device", icon: Smartphone, title: "I'm on shift", body: "Refunds only go back to the wallet that paid.", cta: "Staff App", tone: "teal" },
 ];
 
 export function Home() {
@@ -54,7 +54,7 @@ export function Home() {
     <div className={`landing ns ${dark ? "ns-dark" : "ns-light"}`}>
       <header className="landing-bar">
         <a className="app-mark" href="#/home" aria-label="OnShift home">
-          <img src="/brand/onshift-mark.png" width={38} height={38} alt="" style={{ borderRadius: 10 }} />
+          <img src="/brand/onshift-mark.svg" width={38} height={38} alt="" style={{ borderRadius: 10 }} />
           <span className="brand-word">OnShift</span>
         </a>
         <div className="row landing-nav">
@@ -120,13 +120,21 @@ export function Home() {
               </div>
               <div className="pass-ring">
                 <svg viewBox="0 0 190 190" aria-hidden>
+                  <defs>
+                    <linearGradient id="shiftArc" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#4A90E2" />
+                      <stop offset="35%" stopColor="#45C486" />
+                      <stop offset="70%" stopColor="#8E71EB" />
+                      <stop offset="100%" stopColor="#F5A623" />
+                    </linearGradient>
+                  </defs>
                   <circle cx="95" cy="95" r="84" fill="none" stroke="currentColor" strokeWidth="10" className="pass-ring-track" />
                   <circle
                     cx="95"
                     cy="95"
                     r="84"
                     fill="none"
-                    stroke="currentColor"
+                    stroke="url(#shiftArc)"
                     strokeWidth="10"
                     strokeLinecap="round"
                     strokeDasharray={RING}
@@ -199,8 +207,10 @@ export function Home() {
 
       <section className="doors">
         {DOORS.map((door) => (
-          <button key={door.route} className="door" type="button" onClick={() => navigate(door.route)}>
-            <door.icon size={22} strokeWidth={2.2} />
+          <button key={door.route} className={`door tone-${door.tone}`} type="button" onClick={() => navigate(door.route)}>
+            <span className="door-icon">
+              <door.icon size={20} strokeWidth={2.2} />
+            </span>
             <div className="door-title">{door.title}</div>
             <div className="door-body">{door.body}</div>
             <div className="door-cta">
