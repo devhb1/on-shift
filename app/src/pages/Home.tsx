@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowRight, BadgeCheck, FlaskConical, LayoutGrid, Smartphone } from "lucide-react";
 import { Button, Countdown } from "../components/ui";
 import { useOnShift, useChainNow } from "../lib/onshift";
-import { deployment, networkLabel } from "../lib/config";
+import { deployment, ensAppUrl, explorerAddress, explorerTx, networkLabel } from "../lib/config";
+import { short, usdc } from "../lib/format";
+import { passPreset } from "./shared";
 import { useTheme } from "../lib/theme";
 import { ThemeToggle, navigate, type Route } from "../App";
 
 const REPO = "https://github.com/devhb1/on-shift";
 const RING = 527.8;
-const DEMO_TOTAL = 4 * 3600;
 
 const ATTACKS: { try: string; result: string; who: string; ok?: boolean }[] = [
   { try: "Send the refund to their own wallet", result: "EACUnauthorizedAccountRoles", who: "Permissioned Resolver" },
@@ -26,35 +27,23 @@ const DOORS: { route: Route; icon: typeof BadgeCheck; title: string; body: strin
   { route: "device", icon: Smartphone, title: "I'm on shift", body: "Refunds only go back to the wallet that paid.", cta: "Staff App" },
 ];
 
-function formatLeft(secs: number) {
-  const h = String(Math.floor(secs / 3600)).padStart(2, "0");
-  const m = String(Math.floor((secs % 3600) / 60)).padStart(2, "0");
-  const s = String(secs % 60).padStart(2, "0");
-  return `${h}:${m}:${s}`;
-}
-
 export function Home() {
   const { snapshot } = useOnShift();
   const { dark } = useTheme();
   const now = useChainNow();
   const d = deployment;
   const [name, setName] = useState("");
-  const live = snapshot?.passes.filter((p) => p.state === "live") ?? [];
-  const example = live[0];
-  const exampleRole = example && snapshot ? snapshot.presets[example.presetId]?.name ?? "Cashier" : "Cashier";
-  const [demoLeft, setDemoLeft] = useState(3 * 3600 + 41 * 60 + 12);
-
-  useEffect(() => {
-    if (example) return;
-    const id = setInterval(() => setDemoLeft((n) => Math.max(0, n - 1)), 1000);
-    return () => clearInterval(id);
-  }, [example]);
+  const staffLive = snapshot?.passes.filter((p) => p.state === "live" && !p.sandbox) ?? [];
+  const demoLive = snapshot?.passes.filter((p) => p.state === "live" && p.sandbox) ?? [];
+  const example = staffLive[0] ?? demoLive[0];
+  const exampleRole = example && snapshot ? passPreset(snapshot, example)?.name ?? "Pass" : "";
+  const issueTx = example ? snapshot?.activity.find((a) => a.kind === "issued" && a.label === example.label) : undefined;
 
   const check = (value: string) => navigate("verify", value ? { name: value } : undefined);
   const org = d?.orgName ?? "onshift.eth";
-  const placeholder = example?.name ?? `shift-0412.ops.${org}`;
+  const placeholder = example?.name ?? `play-….demo.${org}`;
 
-  let ringOffset = RING * (1 - demoLeft / DEMO_TOTAL);
+  let ringOffset = RING;
   if (example) {
     const span = Math.max(1, example.expiry - example.issuedAt);
     const left = Math.max(0, example.expiry - now);
@@ -69,6 +58,9 @@ export function Home() {
           <span className="brand-word">OnShift</span>
         </a>
         <div className="row landing-nav">
+          <a className="landing-link keep" href="#/how">
+            How it works
+          </a>
           <a className="landing-link" href="#attacks">
             Security
           </a>
@@ -117,59 +109,91 @@ export function Home() {
           </p>
         </div>
 
-        <aside className="pass-card" aria-label="Example live pass">
-          <div className="pass-top">
-            <span className="pass-status">
-              <span className="dot-live" /> ON SHIFT
-            </span>
-            <span className="pass-org">{org}</span>
-          </div>
-          <div className="pass-ring">
-            <svg viewBox="0 0 190 190" aria-hidden>
-              <circle cx="95" cy="95" r="84" fill="none" stroke="currentColor" strokeWidth="10" className="pass-ring-track" />
-              <circle
-                cx="95"
-                cy="95"
-                r="84"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="10"
-                strokeLinecap="round"
-                strokeDasharray={RING}
-                strokeDashoffset={ringOffset}
-                transform="rotate(-90 95 95)"
-                className="pass-ring-arc"
-              />
-            </svg>
-            <div className="pass-ring-label">
-              <div className="pass-time">{example ? <Countdown expiry={example.expiry} /> : formatLeft(demoLeft)}</div>
-              <div className="pass-time-sub">left on this shift</div>
-            </div>
-          </div>
-          <div className="pass-name mono">
-            {example ? (
-              example.name
-            ) : (
-              <>
-                shift-0412<span>.ops.{org}</span>
-              </>
-            )}
-          </div>
-          <div className="pass-kv">
-            <div>
-              <small>Role</small>
-              <b>{exampleRole}</b>
-            </div>
-            <div>
-              <small>Refund cap</small>
-              <b>bound to payer</b>
-            </div>
-            <div>
-              <small>Transfer</small>
-              <b className="bad">Locked</b>
-            </div>
-          </div>
-          <p className="pass-proof mono">getState() = REGISTERED · roleBitmap = 0 · UniversalResolverV2</p>
+        <aside className="pass-card" aria-label={example ? "Live pass read from Sepolia" : "No pass is on shift"}>
+          {example ? (
+            <>
+              <div className="pass-top">
+                <span className="pass-status">
+                  <span className="dot-live" /> {example.sandbox ? "ON SHIFT · DEMO" : "ON SHIFT"}
+                </span>
+                <span className="pass-org">{org}</span>
+              </div>
+              <div className="pass-ring">
+                <svg viewBox="0 0 190 190" aria-hidden>
+                  <circle cx="95" cy="95" r="84" fill="none" stroke="currentColor" strokeWidth="10" className="pass-ring-track" />
+                  <circle
+                    cx="95"
+                    cy="95"
+                    r="84"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="10"
+                    strokeLinecap="round"
+                    strokeDasharray={RING}
+                    strokeDashoffset={ringOffset}
+                    transform="rotate(-90 95 95)"
+                    className="pass-ring-arc"
+                  />
+                </svg>
+                <div className="pass-ring-label">
+                  <div className="pass-time">
+                    <Countdown expiry={example.expiry} />
+                  </div>
+                  <div className="pass-time-sub">left on this shift</div>
+                </div>
+              </div>
+              <div className="pass-name mono">{example.name}</div>
+              <div className="pass-kv">
+                <div>
+                  <small>Role</small>
+                  <b>{exampleRole}</b>
+                </div>
+                <div>
+                  <small>Cap left</small>
+                  <b>{example.cap > 0n ? usdc(example.cap - example.spent) : "—"}</b>
+                </div>
+                <div>
+                  <small>Holder</small>
+                  <b className="mono">{short(example.holder)}</b>
+                </div>
+              </div>
+              <p className="pass-proof">
+                <button type="button" onClick={() => navigate("verify", { name: example.name })}>
+                  Public check
+                </button>
+                {issueTx && explorerTx(issueTx.txHash) && (
+                  <a href={explorerTx(issueTx.txHash)} target="_blank" rel="noreferrer">
+                    Issuance tx ↗
+                  </a>
+                )}
+                {ensAppUrl(example.name) && (
+                  <a href={ensAppUrl(example.name)} target="_blank" rel="noreferrer">
+                    ENS ↗
+                  </a>
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="pass-top">
+                <span className="pass-status">NOBODY ON SHIFT</span>
+                <span className="pass-org">{org}</span>
+              </div>
+              <p className="landing-sub" style={{ marginTop: 18 }}>
+                This card only shows a pass after Sepolia has mined it. There is no sample name and no countdown until then.
+              </p>
+              <div className="pass-proof">
+                <button type="button" onClick={() => navigate("try")}>
+                  Issue a real demo pass
+                </button>
+                {d && (
+                  <a href={explorerAddress(d.passIssuer)} target="_blank" rel="noreferrer">
+                    PassIssuer ↗
+                  </a>
+                )}
+              </div>
+            </>
+          )}
         </aside>
       </section>
 

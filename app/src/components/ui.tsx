@@ -301,7 +301,11 @@ export function Toasts() {
           <div>
             <div className="toast-title">{t.title}</div>
             {t.detail && <div className="toast-detail">{t.detail}</div>}
-            {t.href && <div className="toast-detail">Confirmed on Sepolia. Etherscan can take a few seconds to leave Pending. ↗</div>}
+            {t.href && (
+              <a className="toast-tx" href={t.href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+                View transaction ↗
+              </a>
+            )}
           </div>
         </div>
       ))}

@@ -6,7 +6,7 @@ import { useOnShift } from "../lib/onshift";
 import { useSession } from "../lib/session";
 import { send } from "../lib/tx";
 import { publicClient } from "../lib/clients";
-import { deployment, GAS_DRIP_WEI, isLocal } from "../lib/config";
+import { deployment, explorerTx, GAS_DRIP_WEI, isLocal } from "../lib/config";
 import { sameAddress, short, toUsdcUnits, usdc } from "../lib/format";
 import { playgroundAbi } from "../generated/abis";
 import { passPreset } from "./shared";
@@ -41,7 +41,7 @@ export function TryPage() {
   const [holderChoice, setHolderChoice] = useState<"new" | "paste">("new");
   const [pasted, setPasted] = useState("");
   const [triesLeft, setTriesLeft] = useState<number>();
-  const [justIssued, setJustIssued] = useState<string>();
+  const [justIssued, setJustIssued] = useState<{ label: string; hash: string; block: string }>();
 
   const preset = presets.find((p) => p.id === presetId) ?? presets[0];
   const capUnits = (() => {
@@ -87,7 +87,7 @@ export function TryPage() {
     const holderDevice = holderChoice === "new" ? addDevice(`${preset?.agent ? "Agent" : "Staff phone"} ${devices.length + 1}`, preset?.agent ? "agent" : "staff") : undefined;
     const holder: Address | undefined = holderDevice ? holderDevice.signer.address : isAddress(pasted) ? (pasted as Address) : undefined;
     if (!holder) return;
-    let label = "";
+    let issued: { label: string; hash: string; block: string } | undefined;
     const ok = await run(
       "try",
       async () => {
@@ -99,14 +99,18 @@ export function TryPage() {
           value: GAS_DRIP_WEI,
         });
         const [tried] = parseEventLogs({ abi: playgroundAbi, logs: receipt.logs, eventName: "Tried" });
-        label = tried?.args.label ?? "";
+        issued = {
+          label: tried?.args.label ?? "",
+          hash: receipt.transactionHash,
+          block: receipt.blockNumber.toString(),
+        };
         return receipt;
       },
       "Demo pass issued",
-      `A sandbox name under demo.${d.orgName} — not real staff.`,
+      `Mined on Sepolia. The name ends in ${demoSuffix}. The transaction link is the proof.`,
     );
-    if (ok && label) {
-      setJustIssued(label);
+    if (ok && issued?.label) {
+      setJustIssued(issued);
       if (holderDevice) setDevice(holderDevice.id);
     }
   };
@@ -114,8 +118,11 @@ export function TryPage() {
   const revoke = (label: string) =>
     run("revoke", () => send(operator!.signer, { address: d.playground!, abi: playgroundAbi, functionName: "revoke", args: [label] }), "Pass ended", `${label}${demoSuffix} no longer verifies.`);
 
-  const issuedName = justIssued ? `${justIssued}${demoSuffix}` : undefined;
+  const issuedName = justIssued?.label ? `${justIssued.label}${demoSuffix}` : undefined;
+  const issuedTx = justIssued?.hash ? explorerTx(justIssued.hash) : "";
   const canIssue = busy === null && capOk && triesLeft !== 0 && (holderChoice === "new" || isAddress(pasted));
+  const stage = !me ? 0 : issuedName ? 2 : 1;
+  const journey = ["Connect", "Issue the pass", "Pay the sandbox", "Refund it", "Check the name"];
 
   return (
     <Shell>
@@ -125,6 +132,14 @@ export function TryPage() {
           <p className="page-sub">A sandbox name under demo.{d.orgName}. It cannot touch the production till. Up to an hour, up to ${MAX_CAP}.</p>
         </div>
       </div>
+      <ol className="journey" aria-label="Demo path">
+        {journey.map((label, i) => (
+          <li key={label} className={i === stage ? "here" : i < stage ? "done" : ""}>
+            <span>{i + 1}</span>
+            {label}
+          </li>
+        ))}
+      </ol>
 
       <div className="play-grid">
           <div className="play-card">
@@ -190,9 +205,18 @@ export function TryPage() {
             <div className="play-card">
               {issuedName ? (
                 <div className="stack-sm">
-                  <div className="play-label">Just issued</div>
+                  <div className="play-label">Mined · block {justIssued?.block}</div>
                   <div className="play-name">{issuedName}</div>
-                  <div className="small secondary">Sandbox only. Public Check should say demo, not staff.</div>
+                  {issuedTx && (
+                    <a className="play-tx" href={issuedTx} target="_blank" rel="noreferrer">
+                      View transaction ↗
+                    </a>
+                  )}
+                  <ol className="play-steps">
+                    <li>Pay the sandbox till with the same wallet, or another one.</li>
+                    <li>Open the staff app and refund that order. The money returns only to the payer.</li>
+                    <li>Public Check this name. It should say demo, not staff.</li>
+                  </ol>
                   <div className="play-actions">
                     <Button variant="primary" icon={CreditCard} onClick={() => navigate("pay", { demo: "1" })}>
                       Pay sandbox
@@ -267,9 +291,12 @@ function Shell({ children }: { children: React.ReactNode }) {
         </span>
         <div className="row">
           <ThemeToggle />
+          <Button variant="plain" onClick={() => navigate("how")}>
+              How it works
+            </Button>
           <Button variant="plain" onClick={() => navigate("home")}>
-            Home
-          </Button>
+              Home
+            </Button>
         </div>
       </div>
       {children}

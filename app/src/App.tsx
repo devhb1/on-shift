@@ -35,8 +35,9 @@ import { Setup } from "./pages/Setup";
 import { PayPage } from "./pages/PayPage";
 import { TryPage } from "./pages/TryPage";
 import { Home } from "./pages/Home";
+import { How } from "./pages/How";
 
-export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify" | "pay" | "try" | "home";
+export type Route = "overview" | "passes" | "new" | "team" | "security" | "activity" | "deployment" | "device" | "verify" | "pay" | "try" | "home" | "how";
 
 const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof Activity }[] }[] = [
   {
@@ -63,7 +64,7 @@ const CONSOLE: { group: string; items: { id: Route; label: string; icon: typeof 
   },
 ];
 
-const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify", "pay", "try", "home"];
+const ROUTES: Route[] = ["overview", "passes", "new", "team", "security", "activity", "deployment", "device", "verify", "pay", "try", "home", "how"];
 
 function parseHash(): { route: Route; params: URLSearchParams } {
   const [path, query] = window.location.hash.replace(/^#\/?/, "").split("?");
@@ -211,6 +212,14 @@ export function App() {
     return (
       <>
         {notReady ? <Setup error={error} /> : <Verify initialName={params.get("name") ?? ""} />}
+        <Toasts />
+      </>
+    );
+  }
+  if (route === "how") {
+    return (
+      <>
+        <How />
         <Toasts />
       </>
     );
